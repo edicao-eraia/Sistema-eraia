@@ -4,6 +4,15 @@ import { Check, X, Inbox, UserPlus, AlertCircle, ChevronDown, ChevronUp, Users, 
 import type { GuardianDraft, Guardian } from '../types';
 import { createGuardianInFirebase, subscribeToGuardianDrafts, approveGuardianDraft, rejectGuardianDraft, updateGuardianDraft, fetchStudentsFromFirebase } from '../lib/db';
 
+// Header com o JWT do servidor (rotas /api agora exigem auth).
+const authHeaders = (): Record<string, string> => {
+  let token: string | null = null;
+  try { token = JSON.parse(localStorage.getItem('eraia_auth') || '{}').token || null; } catch { /* ignore */ }
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+};
+
 export const GuardianInbox: React.FC<{
   onDraftApproved: (guardian?: any) => void;
   auth: any;
@@ -100,7 +109,7 @@ export const GuardianInbox: React.FC<{
         // 2. Mark draft as approved in backend
         const res = await fetch(`/api/guardians/drafts/${id}/approve`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(draftToApprove)
         });
         if (res.ok) {
@@ -113,7 +122,7 @@ export const GuardianInbox: React.FC<{
         // Fallback for missing auth
         const res = await fetch(`/api/guardians/drafts/${id}/approve`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(draftToApprove)
         });
         if (res.ok) {
@@ -152,7 +161,7 @@ export const GuardianInbox: React.FC<{
         }
         const res = await fetch(`/api/guardians/drafts/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(payload)
         });
         if (res.ok) {
@@ -361,7 +370,7 @@ export const GuardianInbox: React.FC<{
                                    newContracts.splice(index, 1);
                                    await fetch(`/api/guardians/drafts/${draft.id}`, {
                                      method: 'PUT',
-                                     headers: { 'Content-Type': 'application/json' },
+                                     headers: authHeaders(),
                                      body: JSON.stringify({ ...draft, contracts: newContracts })
                                    });
                                    
@@ -397,7 +406,7 @@ export const GuardianInbox: React.FC<{
                               }));
                               await fetch(`/api/guardians/drafts/${draft.id}`, {
                                 method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: authHeaders(),
                                 body: JSON.stringify({ ...draft, contracts: [...(draft.contracts || []), ...newContracts] })
                               });
                               

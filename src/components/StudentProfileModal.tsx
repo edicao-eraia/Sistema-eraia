@@ -5,6 +5,15 @@ import { Student, StudentProfile360, SubjectPerformance, TacticalPlan, Booking, 
 import { CurriculumImporterModal } from './CurriculumImporterModal';
 import { Shield, BookOpen, Target, Brain, Key, Plus, Trash2, Lock, Activity, User, Save, X, Mic, Square, Check, AlertCircle, ArrowRight, CheckCircle, Lightbulb, GraduationCap, Calendar, Clock, Award, Sparkles, BookMarked } from 'lucide-react';
 
+// Header com o JWT do servidor (rotas /api exigem auth).
+const authHeaders = (): Record<string, string> => {
+  let token: string | null = null;
+  try { token = JSON.parse(localStorage.getItem('eraia_auth') || '{}').token || null; } catch { /* ignore */ }
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' };
+};
+
 interface StudentProfileModalProps {
   student: Student;
   onClose: () => void;
@@ -37,7 +46,7 @@ export function StudentProfileModal({ student, onClose, onSave }: StudentProfile
     async function fetchBookings() {
       setIsLoadingBookings(true);
       try {
-        const res = await fetch('/api/data');
+        const res = await fetch('/api/data', { headers: authHeaders() });
         if (res.ok) {
           const data = await res.json();
           if (data.bookings) {

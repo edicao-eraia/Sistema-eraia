@@ -328,7 +328,8 @@ app.put('/api/users/me/password', authenticateToken, async (req: any, res: any) 
 
 app.post("/api/webhooks/google-forms", async (req, res) => {
   const token = req.headers['authorization'];
-  if (token !== 'Bearer MEU_TOKEN_SUPER_SECRETO_123') {
+  const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || 'MEU_TOKEN_SUPER_SECRETO_123';
+  if (token !== `Bearer ${WEBHOOK_TOKEN}`) {
     return res.status(401).json({ error: "Unauthorized webhook access" });
   }
   const rawData = req.body;
@@ -387,13 +388,13 @@ app.post("/api/webhooks/google-forms", async (req, res) => {
   }
 });
 
-app.get("/api/drafts", async (req, res) => {
+app.get("/api/drafts", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   
   res.json({ drafts: studentDrafts });
 });
 
 
-app.put("/api/drafts/:id", (req, res) => {
+app.put("/api/drafts/:id", authenticateToken, requireRole(["Administrador"]), (req, res) => {
   const { id } = req.params;
   const draftIndex = studentDrafts.findIndex(d => d.id === id);
   if (draftIndex === -1) return res.status(404).json({ error: "Draft not found" });
@@ -401,7 +402,7 @@ app.put("/api/drafts/:id", (req, res) => {
   res.json({ message: "Draft updated", draft: studentDrafts[draftIndex] });
 });
 
-app.post("/api/drafts/:id/approve", async (req, res) => {
+app.post("/api/drafts/:id/approve", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   const draftIndex = studentDrafts.findIndex((d: any) => d.id === id);
   if (draftIndex === -1) return res.status(404).json({ error: "Draft not found" });
@@ -436,7 +437,7 @@ app.post("/api/drafts/:id/approve", async (req, res) => {
   res.json({ message: "Student approved and created", student: newStudent });
 });
 
-app.post("/api/drafts/:id/reject", (req, res) => {
+app.post("/api/drafts/:id/reject", authenticateToken, requireRole(["Administrador"]), (req, res) => {
   const { id } = req.params;
   const draftIndex = studentDrafts.findIndex(d => d.id === id);
   
@@ -517,13 +518,13 @@ async function syncGoogleSheetsGuardiansDrafts() {
 
 // Standard REST API Endpoints
 
-app.get("/api/guardians/drafts", async (req, res) => {
+app.get("/api/guardians/drafts", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   await syncGoogleSheetsGuardiansDrafts();
   res.json({ drafts: guardianDrafts });
 });
 
 
-app.put("/api/guardians/drafts/:id", (req, res) => {
+app.put("/api/guardians/drafts/:id", authenticateToken, requireRole(["Administrador"]), (req, res) => {
   const { id } = req.params;
   const draftIndex = guardianDrafts.findIndex(d => d.id === id);
   if (draftIndex === -1) return res.status(404).json({ error: "Draft not found" });
@@ -531,7 +532,7 @@ app.put("/api/guardians/drafts/:id", (req, res) => {
   res.json({ message: "Draft updated", draft: guardianDrafts[draftIndex] });
 });
 
-app.post("/api/guardians/drafts/:id/approve", async (req, res) => {
+app.post("/api/guardians/drafts/:id/approve", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   const { studentIds } = req.body;
   const draftIndex = guardianDrafts.findIndex((d: any) => d.id === id);
@@ -573,7 +574,7 @@ app.post("/api/guardians/drafts/:id/approve", async (req, res) => {
   res.json({ message: "Guardian approved and created", guardian: newGuardian });
 });
 
-app.post("/api/guardians/drafts/:id/reject", (req, res) => {
+app.post("/api/guardians/drafts/:id/reject", authenticateToken, requireRole(["Administrador"]), (req, res) => {
   const { id } = req.params;
   const draftIndex = guardianDrafts.findIndex(d => d.id === id);
   
@@ -613,7 +614,7 @@ function recalculateStudentContracts() {
   });
 }
 
-app.get("/api/data", (req, res) => {
+app.get("/api/data", authenticateToken, (req, res) => {
   recalculateStudentContracts();
   res.json({ students, teachers, rooms, bookings, classGroups });
 });
@@ -808,7 +809,7 @@ app.delete("/api/bookings/:id", authenticateToken, async (req: any, res: any) =>
 });
 
 // Create or update Student
-app.post("/api/students/manual", (req, res) => {
+app.post("/api/students/manual", authenticateToken, requireRole(["Administrador"]), (req, res) => {
   const manualData = req.body;
   const newStudent = {
     id: `stud-${Date.now()}`,
@@ -927,7 +928,7 @@ app.post("/api/teachers", authenticateToken, requireRole(["Administrador"]), (re
 // Create or update Room
 
 // Create Guardian
-app.post("/api/guardians", async (req, res) => {
+app.post("/api/guardians", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const newGuardian = req.body;
   await acquireMutex();
   try {
@@ -1017,7 +1018,7 @@ app.put("/api/guardians/:id", authenticateToken, requireRole(["Administrador"]),
 });
 
 // Delete Student
-app.delete("/api/students/:id", async (req, res) => {
+app.delete("/api/students/:id", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   await acquireMutex();
   try {
@@ -1037,7 +1038,7 @@ app.delete("/api/students/:id", async (req, res) => {
 });
 
 // Delete Teacher
-app.delete("/api/teachers/:id", async (req, res) => {
+app.delete("/api/teachers/:id", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   await acquireMutex();
   try {
@@ -1057,7 +1058,7 @@ app.delete("/api/teachers/:id", async (req, res) => {
 });
 
 // Delete Guardian
-app.delete("/api/guardians/:id", async (req, res) => {
+app.delete("/api/guardians/:id", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   await acquireMutex();
   try {
@@ -1079,7 +1080,7 @@ app.delete("/api/guardians/:id", async (req, res) => {
 });
 
 // Delete Room
-app.delete("/api/rooms/:id", async (req, res) => {
+app.delete("/api/rooms/:id", authenticateToken, requireRole(["Administrador"]), async (req, res) => {
   const { id } = req.params;
   
   await acquireMutex();
@@ -1451,7 +1452,7 @@ app.post("/api/bookings", authenticateToken, requireRole(["Administrador"]), asy
 });
 
 // Update booking status (e.g. Cancel / Restore)
-app.patch("/api/bookings/:id", async (req, res) => {
+app.patch("/api/bookings/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { status, topicFinished } = req.body;
 
@@ -1595,7 +1596,7 @@ Dicas para chaves em "data" (use os nomes das chaves do nosso sistema, preencha 
 });
 
 // AI PERFECT MATCH SUGGESTION ENDPOINT
-app.post("/api/ai/suggest", async (req, res) => {
+app.post("/api/ai/suggest", authenticateToken, async (req, res) => {
   const { studentId, teacherId, roomId, date } = req.body;
 
   if (!studentId || !teacherId || !roomId || !date) {
