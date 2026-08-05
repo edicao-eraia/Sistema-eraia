@@ -255,6 +255,11 @@ const requireRole = (roles: Role[]) => {
   };
 };
 
+// Healthcheck aberto (usado por Railway/Render p/ saber se o app está vivo)
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   try {
