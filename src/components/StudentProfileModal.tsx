@@ -1497,13 +1497,28 @@ export function StudentProfileModal({ student, onClose, onSave }: StudentProfile
                         </div>
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Senha (Criptografada no BD)</label>
-                          <input
-                            type="text"
-                            value={profile.credentials?.encryptedPasswordHash || ''}
-                            onChange={(e) => updateProfile({ credentials: { ...profile.credentials!, encryptedPasswordHash: e.target.value } })}
-                            className="w-full border border-slate-200 rounded-lg p-2.5 text-sm font-mono bg-amber-50 border-support-orange/50 text-amber-900"
-                            placeholder="Insira a senha do aluno..."
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={profile.credentials?.encryptedPasswordHash || ''}
+                              onChange={(e) => updateProfile({ credentials: { ...profile.credentials!, encryptedPasswordHash: e.target.value } })}
+                              className="flex-1 border border-slate-200 rounded-lg p-2.5 text-sm font-mono bg-amber-50 border-support-orange/50 text-amber-900"
+                              placeholder="Digite p/ definir/trocar (fica cifrada)…"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const r = await fetch(`/api/students/${student.id}/credentials/reveal`, { headers: authHeaders() });
+                                  const d = await r.json();
+                                  if (r.ok) updateProfile({ credentials: { ...profile.credentials!, encryptedPasswordHash: d.password || '' } });
+                                } catch { /* ignore */ }
+                              }}
+                              className="px-3 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"
+                            >
+                              Revelar
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

@@ -76,6 +76,7 @@ const serverFirebaseApp = initFirebaseServer(firebaseConfigObj);
 const serverDb = getFirestoreServer(serverFirebaseApp, firebaseConfigObj.firestoreDatabaseId);
 import dotenv from "dotenv";
 import { loadState, saveState } from "./src/lib/store.server";
+import { encryptSecret, decryptSecret, vaultConfigured } from "./src/lib/vault.server";
 
 dotenv.config({ path: fsNode.existsSync('.env.local') ? '.env.local' : '.env' });
 
@@ -198,6 +199,32 @@ const validateCollisions = (ignoreId: string | null, studentId: string, teacherI
   }
   return { success: true };
 };
+
+// Cifra a senha do portal do aluno (texto puro -> AES-256-GCM). Preserva a
+// cifra anterior quando nenhuma senha nova é enviada (evita perder/re-cifrar).
+function secureCredentials(student: any, prev?: any) {
+  const cred = student?.profile360?.credentials;
+  if (!cred) return;
+  // O campo `encryptedPasswordHash` é o INPUT do front: se vier preenchido,
+  // é uma senha nova em texto puro pra cifrar. A cifra em si mora em
+  // `encryptedHash`/`iv`/`authTag` e esse campo é sempre zerado após cifrar.
+  const typed = (cred.encryptedPasswordHash || '').toString();
+  if (typed.trim() !== '') {
+    if (vaultConfigured()) {
+      const enc = encryptSecret(typed);
+      cred.encryptedHash = enc.encryptedHash;
+      cred.iv = enc.iv;
+      cred.authTag = enc.authTag;
+      cred.encryptedPasswordHash = ''; // nunca persiste texto puro
+    } else {
+      console.warn('[vault] VAULT_MASTER_KEY ausente — senha do portal NÃO foi cifrada.');
+    }
+  } else if (prev?.profile360?.credentials) {
+    const p = prev.profile360.credentials; // sem senha nova: preserva a cifra existente
+    if (p.encryptedHash) { cred.encryptedHash = p.encryptedHash; cred.iv = p.iv; cred.authTag = p.authTag; }
+    cred.encryptedPasswordHash = '';
+  }
+}
 
 interface Booking {
   id: string;
@@ -435,8 +462,19 @@ app.post("/api/drafts/:id/approve", authenticateToken, requireRole(["Administrad
     }
   };
 
+  // Credenciais do portal vindas do formulário → cifradas no cofre
+  if (draft.portalAlunoSenhaRaw || draft.portalAlunoLink || draft.portalAlunoLogin) {
+    newStudent.profile360.credentials = {
+      schoolPortalUrl: draft.portalAlunoLink || '',
+      username: draft.portalAlunoLogin || '',
+      encryptedPasswordHash: draft.portalAlunoSenhaRaw || '',
+    };
+    secureCredentials(newStudent);
+  }
+
   students.push(newStudent);
   studentDrafts[draftIndex].status = 'Aprovado';
+  studentDrafts[draftIndex].portalAlunoSenhaRaw = ''; // scrub do texto puro no draft
   saveDb();
 
   res.json({ message: "Student approved and created", student: newStudent });
@@ -860,6 +898,7 @@ app.post("/api/students/manual", authenticateToken, requireRole(["Administrador"
     rawDraftData: manualData // For saving all flat fields if needed
   };
   
+  secureCredentials(newStudent);
   students.push(newStudent);
   res.status(201).json({ message: "Student created manually", student: newStudent });
 });
@@ -871,7 +910,13 @@ app.post("/api/students", authenticateToken, requireRole(["Administrador"]), (re
   }
 
   if (studentData.id) {
-    students = students.map((s) => (s.id === studentData.id ? { ...s, ...studentData } : s));
+    const idx = students.findIndex((s: any) => s.id === studentData.id);
+    if (idx !== -1) {
+      const prev = students[idx];
+      students[idx] = { ...prev, ...studentData };
+      secureCredentials(students[idx], prev);
+      return res.json({ message: "Aluno atualizado com sucesso", student: students[idx] });
+    }
     res.json({ message: "Aluno atualizado com sucesso", student: studentData });
   } else {
     const newStudent: any = {
@@ -879,6 +924,7 @@ app.post("/api/students", authenticateToken, requireRole(["Administrador"]), (re
       id: `stud-${Date.now()}`,
       availability: studentData.availability || []
     };
+    secureCredentials(newStudent);
     students.push(newStudent);
     res.status(211).json({ message: "Aluno cadastrado com sucesso", student: newStudent });
   }
@@ -992,10 +1038,28 @@ app.put("/api/students/:id", authenticateToken, requireRole(["Administrador"]), 
   try {
     const index = students.findIndex((s: any) => s.id === id);
     if (index === -1) return res.status(404).json({ error: "Aluno não encontrado." });
-    students[index] = { ...students[index], ...req.body, id };
+    const prev = students[index];
+    students[index] = { ...prev, ...req.body, id };
+    secureCredentials(students[index], prev);
     res.json({ message: "Aluno atualizado com sucesso", student: students[index] });
   } finally {
     releaseMutex();
+  }
+});
+
+// Revela (decifra) a senha do portal do aluno — admin only
+app.get("/api/students/:id/credentials/reveal", authenticateToken, requireRole(["Administrador"]), (req: any, res: any) => {
+  const s = students.find((x: any) => x.id === req.params.id);
+  if (!s) return res.status(404).json({ error: "Aluno não encontrado." });
+  const c = s.profile360?.credentials;
+  if (!c || !c.encryptedHash || !c.iv || !c.authTag) {
+    return res.json({ schoolPortalUrl: c?.schoolPortalUrl || '', username: c?.username || '', password: '' });
+  }
+  try {
+    const password = decryptSecret(c.encryptedHash, c.iv, c.authTag);
+    res.json({ schoolPortalUrl: c.schoolPortalUrl || '', username: c.username || '', password });
+  } catch (e) {
+    res.status(500).json({ error: "Não foi possível decifrar (VAULT_MASTER_KEY ausente/incorreta ou dados corrompidos)." });
   }
 });
 
