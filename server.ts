@@ -1809,6 +1809,186 @@ app.post("/api/ai/suggest", authenticateToken, async (req, res) => {
 });
 
 
+// ===================================================================
+//  F4 — MOTOR DE AGENDA AUTÔNOMO
+//  Gera uma proposta de agenda semanal cruzando disponibilidade de
+//  aluno × professores × salas, respeitando o saldo de horas do
+//  contrato e a carga horária dos planos táticos. NÃO cria os
+//  agendamentos — devolve a proposta pro admin revisar/aprovar.
+// ===================================================================
+app.post("/api/ai/auto-schedule", authenticateToken, requireRole(["Administrador"]), async (req: any, res: any) => {
+  const { studentId, weekStartDate, sessionMinutes } = req.body;
+  const student = students.find((s: any) => s.id === studentId);
+  if (!student) return res.status(404).json({ error: "Aluno não encontrado." });
+
+  // Segunda-feira de referência (informada ou a próxima)
+  const baseDate = weekStartDate
+    ? new Date(weekStartDate + "T00:00:00")
+    : (() => {
+        const d = new Date(); d.setHours(0, 0, 0, 0);
+        const day = d.getDay();               // 0 dom .. 6 sáb
+        const diff = day === 0 ? 1 : (8 - day); // próxima segunda
+        d.setDate(d.getDate() + diff);
+        return d;
+      })();
+
+  const availability = student.availability || student.profile360?.availability || [];
+  const plans = student.profile360?.tacticalPlans || [];
+  const contract = student.contract;
+  const totalH = contract ? (contract.totalHours || 0) : 0;
+  const usedH = contract ? (contract.usedHours || 0) : 0;
+  let remainingMin = contract ? Math.max(0, totalH - usedH) * 60 : Infinity;
+
+  // Restrição médica: TDAH/concentração → blocos de 45min
+  const hasTDAH = (student.profile360?.medicalRecords || []).some((m: any) =>
+    /tdah|concentra|déficit|deficit/i.test(`${m.condition || ""} ${m.notes || ""}`));
+  const slotLen = Number(sessionMinutes) || (hasTDAH ? 45 : 60);
+
+  const proposal: any[] = [];
+  const fmt = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+  const dateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const activeBookings = () => bookings.filter((b: any) => b.status !== "cancelada" && b.status !== "desmarcada");
+
+  // Professor OU aluno já ocupado nesse horário (independe de sala)
+  const busyTeacherOrStudent = (teacherId: string, date: string, s: string, e: string) =>
+    [...activeBookings(), ...proposal].some((b: any) =>
+      b.date === date && rangesOverlap(b.startTime, b.endTime, s, e) &&
+      (b.teacherId === teacherId || b.studentId === studentId));
+
+  // Primeira sala livre nesse horário
+  const findFreeRoom = (date: string, s: string, e: string) => {
+    const all = [...activeBookings(), ...proposal];
+    return rooms.find((r: any) => !all.some((b: any) =>
+      b.date === date && b.roomId === r.id && rangesOverlap(b.startTime, b.endTime, s, e))) || null;
+  };
+
+  const unmet: any[] = [];
+
+  for (const plan of plans) {
+    const requestedMin = (plan.weeklyHours || 0) * 60;
+    if (requestedMin <= 0) continue;
+    if (remainingMin <= 0) { unmet.push({ subject: plan.subject, reason: "Saldo de horas do contrato esgotado." }); continue; }
+
+    const teachersForSubject = teachers.filter((t: any) => {
+      const ts = (t.subject || "").toLowerCase().trim();
+      const ps = (plan.subject || "").toLowerCase().trim();
+      return ts && ps && (ts.includes(ps) || ps.includes(ts));
+    });
+    if (teachersForSubject.length === 0) { unmet.push({ subject: plan.subject, reason: "Nenhum professor cadastrado para esta matéria." }); continue; }
+
+    let needMin = Math.min(requestedMin, remainingMin);
+    let allocatedMin = 0;
+
+    // Distribui: no máx. uma sessão dessa matéria por dia útil
+    for (let dow = 1; dow <= 5 && needMin > 0; dow++) {
+      const dayDate = new Date(baseDate);
+      dayDate.setDate(baseDate.getDate() + (dow - 1));
+      const dateS = dateStr(dayDate);
+
+      const studAv = availability.find((a: any) => Number(a.dayOfWeek) === dow);
+      if (!studAv) continue;
+
+      let placed = false;
+      for (const teacher of teachersForSubject) {
+        if (placed) break;
+        const tAv = (teacher.availability || []).find((a: any) => Number(a.dayOfWeek) === dow);
+        if (!tAv) continue;
+
+        const winStart = Math.max(timeToMinutes(studAv.startTime), timeToMinutes(tAv.startTime));
+        const winEnd = Math.min(timeToMinutes(studAv.endTime), timeToMinutes(tAv.endTime));
+
+        for (let cur = winStart; cur + slotLen <= winEnd; cur += slotLen) {
+          const s = fmt(cur), e = fmt(cur + slotLen);
+          if (busyTeacherOrStudent(teacher.id, dateS, s, e)) continue;
+          const room = findFreeRoom(dateS, s, e);
+          if (!room) continue;
+
+          proposal.push({
+            studentId,
+            studentName: student.name,
+            teacherId: teacher.id,
+            teacherName: teacher.name,
+            roomId: room.id,
+            roomName: room.name,
+            date: dateS,
+            dayOfWeek: dow,
+            startTime: s,
+            endTime: e,
+            subject: plan.subject,
+            reasoning: `${plan.subject} com ${teacher.name} na ${room.name}. Aluno e professor livres; sala sem conflito.${hasTDAH ? " Bloco de 45min (TDAH)." : ""}`,
+          });
+          needMin -= slotLen; remainingMin -= slotLen; allocatedMin += slotLen;
+          placed = true;
+          break;
+        }
+      }
+    }
+
+    if (allocatedMin < requestedMin) {
+      unmet.push({
+        subject: plan.subject,
+        requestedHours: plan.weeklyHours,
+        allocatedHours: Math.round((allocatedMin / 60) * 100) / 100,
+        reason: allocatedMin === 0
+          ? "Sem sobreposição de horário/sala disponível na semana."
+          : "Encaixe parcial — não coube toda a carga horária.",
+      });
+    }
+  }
+
+  const summary =
+    `${proposal.length} aula(s) sugerida(s) para ${student.name} na semana de ${dateStr(baseDate)}.` +
+    (hasTDAH ? " Blocos de 45min por conta de TDAH." : "") +
+    (contract
+      ? ` Saldo restante após a proposta: ${remainingMin === Infinity ? "—" : (remainingMin / 60).toFixed(1)}h.`
+      : " Aluno sem contrato cadastrado (saldo de horas não limitado).") +
+    (plans.length === 0 ? " ⚠️ Aluno não tem planos táticos (matéria + carga horária) cadastrados — nada a agendar." : "");
+
+  res.json({
+    success: true,
+    weekStart: dateStr(baseDate),
+    sessionMinutes: slotLen,
+    proposal,
+    unmet,
+    summary,
+  });
+});
+
+// F4b — Aplica uma proposta aprovada: cria os agendamentos reais.
+// Revalida colisão de cada sessão; devolve o que criou e o que pulou.
+app.post("/api/ai/auto-schedule/commit", authenticateToken, requireRole(["Administrador"]), async (req: any, res: any) => {
+  const { sessions } = req.body;
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return res.status(400).json({ error: "Nenhuma sessão para agendar." });
+  }
+  await acquireMutex();
+  try {
+    const created: any[] = [];
+    const skipped: any[] = [];
+    for (const s of sessions) {
+      const coll = validateCollisions(null, s.studentId, s.teacherId, s.roomId, s.date, s.startTime, s.endTime);
+      if (!coll.success) { skipped.push({ ...s, reason: coll.error }); continue; }
+      const booking = {
+        id: `booking-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        studentId: s.studentId,
+        teacherId: s.teacherId,
+        roomId: s.roomId,
+        date: s.date,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        subject: s.subject,
+        status: "agendada",
+        createdAt: new Date().toISOString(),
+      };
+      bookings.push(booking);
+      created.push(booking);
+    }
+    res.json({ success: true, created, skipped });
+  } finally {
+    releaseMutex();
+  }
+});
+
 // Dev & Production serving configuration
 async function startServer() {
   
