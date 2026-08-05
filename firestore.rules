@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function incoming() {
+      return request.resource.data;
+    }
+    function existing() {
+      return resource.data;
+    }
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function isValidStudent(data) {
+      return data.keys().hasAll(['name', 'email', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.name is string && data.name.size() <= 100
+        && data.email is string && data.email.size() <= 100
+        && data.ownerId == request.auth.uid;
+    }
+    function isValidGuardian(data) {
+      return data.keys().hasAll(['name', 'email', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.email is string
+        && data.ownerId == request.auth.uid;
+    }
+    function isValidTeacher(data) {
+      return data.keys().hasAll(['name', 'email', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.email is string
+        && data.ownerId == request.auth.uid;
+    }
+    function isValidRoom(data) {
+      return data.keys().hasAll(['name', 'capacity', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.capacity is number
+        && data.ownerId == request.auth.uid;
+    }
+    function isValidClassGroup(data) {
+      return data.keys().hasAll(['name', 'ownerId', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.ownerId == request.auth.uid;
+    }
+    match /students/{studentId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(studentId) 
+                    && isValidStudent(incoming()) 
+                    && incoming().createdAt is number
+                    && incoming().updatedAt is number;
+      allow update: if isSignedIn() && isValidId(studentId)
+                    && isValidStudent(incoming())
+                    && incoming().updatedAt is number
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+    match /guardians/{guardianId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(guardianId) 
+                    && isValidGuardian(incoming()) 
+                    && incoming().createdAt is number
+                    && incoming().updatedAt is number;
+      allow update: if isSignedIn() && isValidId(guardianId)
+                    && isValidGuardian(incoming())
+                    && incoming().updatedAt is number
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(teacherId) 
+                    && isValidTeacher(incoming()) 
+                    && incoming().createdAt is number
+                    && incoming().updatedAt is number;
+      allow update: if isSignedIn() && isValidId(teacherId)
+                    && isValidTeacher(incoming())
+                    && incoming().updatedAt is number
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+    match /rooms/{roomId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(roomId) 
+                    && isValidRoom(incoming()) 
+                    && incoming().createdAt is number
+                    && incoming().updatedAt is number;
+      allow update: if isSignedIn() && isValidId(roomId)
+                    && isValidRoom(incoming())
+                    && incoming().updatedAt is number
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+    match /classGroups/{groupId} {
+      allow read: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(groupId) 
+                    && isValidClassGroup(incoming()) 
+                    && incoming().createdAt is number
+                    && incoming().updatedAt is number;
+      allow update: if isSignedIn() && isValidId(groupId)
+                    && isValidClassGroup(incoming())
+                    && incoming().updatedAt is number
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+    }
+    match /studentDrafts/{draftId} {
+      allow read, list, update, delete: if isSignedIn();
+      allow create: if true;
+    }
+    match /guardianDrafts/{draftId} {
+      allow read, list, update, delete: if isSignedIn();
+      allow create: if true;
+    }
+    match /bookings/{bookingId} {
+      allow read, list, update, delete: if isSignedIn();
+      allow create: if isSignedIn();
+    }
+  }
+}

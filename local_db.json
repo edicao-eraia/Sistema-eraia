@@ -1,0 +1,617 @@
+{
+  "users": [
+    {
+      "id": "usr-master",
+      "email": "eraiaeducacaoguiada@gmail.com",
+      "passwordHash": "$2b$10$UManNYsP9aEeiQGvqFMTbueJW2JS/CCp1BpAQTc40WxuA6WK4NE6q",
+      "name": "Administrador e-RaIA",
+      "role": "Administrador"
+    },
+    {
+      "id": "usr-teach-matheus",
+      "email": "matheus.souza@escola.com",
+      "passwordHash": "$2b$10$yzbXeXf.pXkKCwXMtZtu4uN5BflvGLJpsVLGfqz51m5SGuNk4j95a",
+      "name": "Prof. Matheus Souza",
+      "role": "Professor",
+      "linkedId": "teach-matheus"
+    }
+  ],
+  "guardianDrafts": [
+    {
+      "id": "draft-g-1",
+      "status": "Pendente",
+      "submittedAt": "2026-07-20T21:28:13.872Z",
+      "nomeCompleto": "Maria da Silva",
+      "email": "maria.silva@email.com",
+      "whatsapp": "61999999999",
+      "cpf": "11122233344",
+      "nomeAluno": "João Silva",
+      "parentesco": "Mãe",
+      "responsavelFinanceiro": true,
+      "rawResponses": {
+        "Nome Completo": "Maria da Silva",
+        "Telefone": "61999999999"
+      }
+    }
+  ],
+  "guardians": [],
+  "studentDrafts": [],
+  "students": [
+    {
+      "id": "stud-1",
+      "name": "João Silva",
+      "email": "joao.silva@email.com",
+      "phone": "(11) 98765-4321",
+      "level": "Intermediário",
+      "availability": [
+        {
+          "dayOfWeek": 1,
+          "startTime": "09:00",
+          "endTime": "12:00"
+        },
+        {
+          "dayOfWeek": 3,
+          "startTime": "09:00",
+          "endTime": "12:00"
+        },
+        {
+          "dayOfWeek": 5,
+          "startTime": "14:00",
+          "endTime": "18:00"
+        }
+      ],
+      "fixedActivities": [
+        "Escola",
+        "Academia"
+      ]
+    },
+    {
+      "id": "stud-2",
+      "name": "Maria Santos",
+      "email": "maria.santos@email.com",
+      "phone": "(11) 97777-8888",
+      "level": "Iniciante",
+      "availability": [
+        {
+          "dayOfWeek": 2,
+          "startTime": "14:00",
+          "endTime": "18:00"
+        },
+        {
+          "dayOfWeek": 4,
+          "startTime": "14:00",
+          "endTime": "18:00"
+        }
+      ],
+      "fixedActivities": [
+        "Escola",
+        "Terapia"
+      ]
+    },
+    {
+      "id": "stud-3",
+      "name": "Pedro Oliveira",
+      "email": "pedro.oliveira@email.com",
+      "phone": "(11) 96666-5555",
+      "level": "Avançado",
+      "availability": [
+        {
+          "dayOfWeek": 1,
+          "startTime": "14:00",
+          "endTime": "18:00"
+        },
+        {
+          "dayOfWeek": 5,
+          "startTime": "09:00",
+          "endTime": "12:00"
+        }
+      ],
+      "fixedActivities": [
+        "Academia",
+        "Atividade Física"
+      ]
+    },
+    {
+      "id": "stud-4",
+      "name": "Ana Costa",
+      "email": "ana.costa@email.com",
+      "phone": "(11) 95555-4444",
+      "level": "Intermediário",
+      "availability": [
+        {
+          "dayOfWeek": 3,
+          "startTime": "13:00",
+          "endTime": "17:00"
+        },
+        {
+          "dayOfWeek": 5,
+          "startTime": "13:00",
+          "endTime": "17:00"
+        }
+      ],
+      "fixedActivities": [
+        "Atividade Religiosa",
+        "Terapia"
+      ]
+    }
+  ],
+  "teachers": [
+    {
+      "id": "teach-1",
+      "name": "Prof. Carlos Souza",
+      "email": "carlos.souza@escoladeidiomas.com",
+      "subject": "Inglês",
+      "availability": [
+        {
+          "dayOfWeek": 1,
+          "startTime": "08:00",
+          "endTime": "12:00"
+        },
+        {
+          "dayOfWeek": 3,
+          "startTime": "08:00",
+          "endTime": "12:00"
+        },
+        {
+          "dayOfWeek": 5,
+          "startTime": "08:00",
+          "endTime": "15:00"
+        }
+      ]
+    },
+    {
+      "id": "teach-2",
+      "name": "Profa. Juliana Lima",
+      "email": "juliana.lima@escola.com",
+      "subject": "Matemática",
+      "availability": [
+        {
+          "dayOfWeek": 2,
+          "startTime": "13:00",
+          "endTime": "18:00"
+        },
+        {
+          "dayOfWeek": 4,
+          "startTime": "13:00",
+          "endTime": "18:00"
+        }
+      ]
+    },
+    {
+      "id": "teach-3",
+      "name": "Prof. Marcos Rocha",
+      "email": "marcos.rocha@escola.com",
+      "subject": "Física",
+      "availability": [
+        {
+          "dayOfWeek": 1,
+          "startTime": "13:00",
+          "endTime": "19:00"
+        },
+        {
+          "dayOfWeek": 3,
+          "startTime": "13:00",
+          "endTime": "19:00"
+        }
+      ]
+    },
+    {
+      "id": "teach-4",
+      "name": "Profa. Fernanda Alves",
+      "email": "fernanda.alves@idiomas.com",
+      "subject": "Espanhol",
+      "availability": [
+        {
+          "dayOfWeek": 1,
+          "startTime": "13:00",
+          "endTime": "17:00"
+        },
+        {
+          "dayOfWeek": 3,
+          "startTime": "13:00",
+          "endTime": "17:00"
+        },
+        {
+          "dayOfWeek": 5,
+          "startTime": "13:00",
+          "endTime": "17:00"
+        }
+      ]
+    },
+    {
+      "id": "teach-matheus",
+      "name": "Prof. Matheus Souza",
+      "email": "matheus.souza@escola.com",
+      "subject": "Física",
+      "availability": [
+        {
+          "dayOfWeek": 2,
+          "startTime": "08:00",
+          "endTime": "12:00"
+        },
+        {
+          "dayOfWeek": 4,
+          "startTime": "08:00",
+          "endTime": "12:00"
+        }
+      ]
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room-1",
+      "name": "Sala 101 - Laboratório",
+      "capacity": 10,
+      "resources": [
+        "Projetor",
+        "Lousa Digital",
+        "Computadores"
+      ]
+    },
+    {
+      "id": "room-2",
+      "name": "Sala 102 - Idiomas",
+      "capacity": 4,
+      "resources": [
+        "Headsets",
+        "Projetor",
+        "Sistema de Som"
+      ]
+    },
+    {
+      "id": "room-3",
+      "name": "Sala 103 - Individual",
+      "capacity": 2,
+      "resources": [
+        "Lousa Digital",
+        "Climatização"
+      ]
+    },
+    {
+      "id": "room-4",
+      "name": "Sala Virtual Zoom 1",
+      "capacity": 100,
+      "resources": [
+        "Gravação em Nuvem",
+        "Integração Digital"
+      ]
+    }
+  ],
+  "bookings": [
+    {
+      "id": "book-1",
+      "studentId": "stud-1",
+      "teacherId": "teach-1",
+      "roomId": "room-2",
+      "date": "2026-07-06",
+      "startTime": "10:00",
+      "endTime": "11:00",
+      "status": "agendada",
+      "createdAt": "2026-07-20T21:28:13.872Z"
+    },
+    {
+      "id": "book-2",
+      "studentId": "stud-2",
+      "teacherId": "teach-2",
+      "roomId": "room-3",
+      "date": "2026-07-07",
+      "startTime": "15:00",
+      "endTime": "16:00",
+      "status": "agendada",
+      "createdAt": "2026-07-20T21:28:13.872Z"
+    }
+  ],
+  "classGroups": [],
+  "systemBackups": [
+    {
+      "id": "eraia_backup_1784911267408",
+      "timestamp": "2026-07-24T16:41:07.408Z",
+      "label": "Backup de Teste Inicial",
+      "data": {
+        "users": [
+          {
+            "id": "usr-master",
+            "email": "eraiaeducacaoguiada@gmail.com",
+            "passwordHash": "$2b$10$UManNYsP9aEeiQGvqFMTbueJW2JS/CCp1BpAQTc40WxuA6WK4NE6q",
+            "name": "Administrador e-RaIA",
+            "role": "Administrador"
+          },
+          {
+            "id": "usr-teach-matheus",
+            "email": "matheus.souza@escola.com",
+            "passwordHash": "$2b$10$yzbXeXf.pXkKCwXMtZtu4uN5BflvGLJpsVLGfqz51m5SGuNk4j95a",
+            "name": "Prof. Matheus Souza",
+            "role": "Professor",
+            "linkedId": "teach-matheus"
+          }
+        ],
+        "guardianDrafts": [
+          {
+            "id": "draft-g-1",
+            "status": "Pendente",
+            "submittedAt": "2026-07-20T21:28:13.872Z",
+            "nomeCompleto": "Maria da Silva",
+            "email": "maria.silva@email.com",
+            "whatsapp": "61999999999",
+            "cpf": "11122233344",
+            "nomeAluno": "João Silva",
+            "parentesco": "Mãe",
+            "responsavelFinanceiro": true,
+            "rawResponses": {
+              "Nome Completo": "Maria da Silva",
+              "Telefone": "61999999999"
+            }
+          }
+        ],
+        "guardians": [],
+        "studentDrafts": [],
+        "students": [
+          {
+            "id": "stud-1",
+            "name": "João Silva",
+            "email": "joao.silva@email.com",
+            "phone": "(11) 98765-4321",
+            "level": "Intermediário",
+            "availability": [
+              {
+                "dayOfWeek": 1,
+                "startTime": "09:00",
+                "endTime": "12:00"
+              },
+              {
+                "dayOfWeek": 3,
+                "startTime": "09:00",
+                "endTime": "12:00"
+              },
+              {
+                "dayOfWeek": 5,
+                "startTime": "14:00",
+                "endTime": "18:00"
+              }
+            ],
+            "fixedActivities": [
+              "Escola",
+              "Academia"
+            ]
+          },
+          {
+            "id": "stud-2",
+            "name": "Maria Santos",
+            "email": "maria.santos@email.com",
+            "phone": "(11) 97777-8888",
+            "level": "Iniciante",
+            "availability": [
+              {
+                "dayOfWeek": 2,
+                "startTime": "14:00",
+                "endTime": "18:00"
+              },
+              {
+                "dayOfWeek": 4,
+                "startTime": "14:00",
+                "endTime": "18:00"
+              }
+            ],
+            "fixedActivities": [
+              "Escola",
+              "Terapia"
+            ]
+          },
+          {
+            "id": "stud-3",
+            "name": "Pedro Oliveira",
+            "email": "pedro.oliveira@email.com",
+            "phone": "(11) 96666-5555",
+            "level": "Avançado",
+            "availability": [
+              {
+                "dayOfWeek": 1,
+                "startTime": "14:00",
+                "endTime": "18:00"
+              },
+              {
+                "dayOfWeek": 5,
+                "startTime": "09:00",
+                "endTime": "12:00"
+              }
+            ],
+            "fixedActivities": [
+              "Academia",
+              "Atividade Física"
+            ]
+          },
+          {
+            "id": "stud-4",
+            "name": "Ana Costa",
+            "email": "ana.costa@email.com",
+            "phone": "(11) 95555-4444",
+            "level": "Intermediário",
+            "availability": [
+              {
+                "dayOfWeek": 3,
+                "startTime": "13:00",
+                "endTime": "17:00"
+              },
+              {
+                "dayOfWeek": 5,
+                "startTime": "13:00",
+                "endTime": "17:00"
+              }
+            ],
+            "fixedActivities": [
+              "Atividade Religiosa",
+              "Terapia"
+            ]
+          }
+        ],
+        "teachers": [
+          {
+            "id": "teach-1",
+            "name": "Prof. Carlos Souza",
+            "email": "carlos.souza@escoladeidiomas.com",
+            "subject": "Inglês",
+            "availability": [
+              {
+                "dayOfWeek": 1,
+                "startTime": "08:00",
+                "endTime": "12:00"
+              },
+              {
+                "dayOfWeek": 3,
+                "startTime": "08:00",
+                "endTime": "12:00"
+              },
+              {
+                "dayOfWeek": 5,
+                "startTime": "08:00",
+                "endTime": "15:00"
+              }
+            ]
+          },
+          {
+            "id": "teach-2",
+            "name": "Profa. Juliana Lima",
+            "email": "juliana.lima@escola.com",
+            "subject": "Matemática",
+            "availability": [
+              {
+                "dayOfWeek": 2,
+                "startTime": "13:00",
+                "endTime": "18:00"
+              },
+              {
+                "dayOfWeek": 4,
+                "startTime": "13:00",
+                "endTime": "18:00"
+              }
+            ]
+          },
+          {
+            "id": "teach-3",
+            "name": "Prof. Marcos Rocha",
+            "email": "marcos.rocha@escola.com",
+            "subject": "Física",
+            "availability": [
+              {
+                "dayOfWeek": 1,
+                "startTime": "13:00",
+                "endTime": "19:00"
+              },
+              {
+                "dayOfWeek": 3,
+                "startTime": "13:00",
+                "endTime": "19:00"
+              }
+            ]
+          },
+          {
+            "id": "teach-4",
+            "name": "Profa. Fernanda Alves",
+            "email": "fernanda.alves@idiomas.com",
+            "subject": "Espanhol",
+            "availability": [
+              {
+                "dayOfWeek": 1,
+                "startTime": "13:00",
+                "endTime": "17:00"
+              },
+              {
+                "dayOfWeek": 3,
+                "startTime": "13:00",
+                "endTime": "17:00"
+              },
+              {
+                "dayOfWeek": 5,
+                "startTime": "13:00",
+                "endTime": "17:00"
+              }
+            ]
+          },
+          {
+            "id": "teach-matheus",
+            "name": "Prof. Matheus Souza",
+            "email": "matheus.souza@escola.com",
+            "subject": "Física",
+            "availability": [
+              {
+                "dayOfWeek": 2,
+                "startTime": "08:00",
+                "endTime": "12:00"
+              },
+              {
+                "dayOfWeek": 4,
+                "startTime": "08:00",
+                "endTime": "12:00"
+              }
+            ]
+          }
+        ],
+        "rooms": [
+          {
+            "id": "room-1",
+            "name": "Sala 101 - Laboratório",
+            "capacity": 10,
+            "resources": [
+              "Projetor",
+              "Lousa Digital",
+              "Computadores"
+            ]
+          },
+          {
+            "id": "room-2",
+            "name": "Sala 102 - Idiomas",
+            "capacity": 4,
+            "resources": [
+              "Headsets",
+              "Projetor",
+              "Sistema de Som"
+            ]
+          },
+          {
+            "id": "room-3",
+            "name": "Sala 103 - Individual",
+            "capacity": 2,
+            "resources": [
+              "Lousa Digital",
+              "Climatização"
+            ]
+          },
+          {
+            "id": "room-4",
+            "name": "Sala Virtual Zoom 1",
+            "capacity": 100,
+            "resources": [
+              "Gravação em Nuvem",
+              "Integração Digital"
+            ]
+          }
+        ],
+        "classGroups": [],
+        "bookings": [
+          {
+            "id": "book-1",
+            "studentId": "stud-1",
+            "teacherId": "teach-1",
+            "roomId": "room-2",
+            "date": "2026-07-06",
+            "startTime": "10:00",
+            "endTime": "11:00",
+            "status": "agendada",
+            "createdAt": "2026-07-20T21:28:13.872Z"
+          },
+          {
+            "id": "book-2",
+            "studentId": "stud-2",
+            "teacherId": "teach-2",
+            "roomId": "room-3",
+            "date": "2026-07-07",
+            "startTime": "15:00",
+            "endTime": "16:00",
+            "status": "agendada",
+            "createdAt": "2026-07-20T21:28:13.872Z"
+          }
+        ]
+      }
+    }
+  ]
+}

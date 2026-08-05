@@ -1,0 +1,21 @@
+# Blueprint de deploy no Render (servidor Node persistente).
+# Depois de conectar o repo GitHub, o Render lê este arquivo e provisiona o serviço.
+services:
+  - type: web
+    name: eraia-agenda
+    runtime: node
+    plan: free
+    region: oregon            # troque se quiser outra região
+    buildCommand: npm install && npm run build
+    startCommand: npm start   # node dist/server.cjs (serve o dist/ estático + API)
+    healthCheckPath: /api/data
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Secrets: defina os valores no painel do Render (sync:false = não versiona)
+      - key: DATABASE_URL          # << connection string do POOLER do Supabase (IPv4, :5432 session)
+        sync: false
+      - key: JWT_SECRET            # << segredo forte (o mesmo do .env.local ou um novo)
+        sync: false
+      - key: GEMINI_API_KEY        # << sua chave do Gemini (motor de IA)
+        sync: false

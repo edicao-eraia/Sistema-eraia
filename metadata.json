@@ -1,0 +1,6 @@
+{
+  "name": "Gerenciador de Agenda de Aulas",
+  "description": "Sistema de gerenciamento de agendas para aulas individuais com bloqueio de colisão e sugestões por inteligência artificial.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

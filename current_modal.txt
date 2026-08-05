@@ -1,0 +1,172 @@
+        {isBackupModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Save className="w-5 h-5 text-support-blue" />
+                    Gerenciador de Backups
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-1">Crie e restaure pontos de restauração do sistema.</p>
+                </div>
+                <button onClick={() => setIsBackupModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <p className="text-xs sm:text-sm text-slate-600">
+                  O backup salva todas as tabelas do banco de dados (alunos, turmas, agendamentos, etc).
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <label className={`w-full sm:w-auto justify-center px-3 py-2 sm:px-4 sm:py-2 bg-white border border-slate-300 text-slate-700 text-xs sm:text-sm font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${isProcessingSystem ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'}`}>
+                  {isProcessingSystem ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  Importar Arquivo
+                  <input type="file" accept=".json" disabled={isProcessingSystem} className="hidden" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                      try {
+                        const content = JSON.parse(ev.target?.result as string);
+                        if (!confirm("Tem certeza que deseja restaurar o sistema a partir deste arquivo? Isso substituirá todos os dados atuais.")) return;
+                        setIsProcessingSystem(true);
+                        const res = await authFetch('/api/system/restore', {
+                           method: "POST",
+                           body: JSON.stringify({ data: content.data || content })
+                        });
+                        if (res.ok) window.location.reload();
+                        else alert("Erro ao restaurar arquivo.");
+                      } catch (err) {
+                        alert("Arquivo inválido.");
+                      }
+                      setIsProcessingSystem(false);
+                    };
+                    reader.readAsText(file);
+                  }} />
+                </label>
+                <button
+                  onClick={() => handleCreateBackup()}
+                  disabled={isProcessingSystem}
+                  className="w-full sm:w-auto justify-center px-3 py-2 sm:px-4 sm:py-2 bg-support-blue hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessingSystem ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  {isProcessingSystem ? "Aguarde..." : "Criar Backup"}
+                </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                {backupProgress && (
+                  <div className="mb-6 bg-blue-50 border border-blue-100 rounded-xl p-6 text-center animate-fade-in flex flex-col items-center justify-center">
+                    {backupProgress.percentage < 100 ? (
+                      <Loader2 className="w-8 h-8 animate-spin text-support-blue mb-4" />
+                    ) : (
+                      <Save className="w-8 h-8 text-green-500 mb-4" />
+                    )}
+                    <p className="text-sm font-bold text-slate-800 mb-2">{backupProgress.text}</p>
+                    <div className="w-full max-w-sm h-2 bg-blue-100 rounded-full overflow-hidden">
+                       <div className={`h-full transition-all duration-500 ease-out ${backupProgress.percentage === 100 ? 'bg-green-500' : 'bg-support-blue'}`} style={{ width: `${backupProgress.percentage}%` }} />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">{backupProgress.percentage}%</p>
+                  </div>
+                )}
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Pesquisar backups por nome ou data..."
+                      value={backupSearchQuery}
+                      onChange={(e) => setBackupSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-support-blue focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                {availableBackups.filter(b => 
+                  b.label.toLowerCase().includes(backupSearchQuery.toLowerCase()) || 
+                  new Date(b.timestamp).toLocaleString('pt-BR').includes(backupSearchQuery)
+                ).length === 0 ? (
+                   <div className="text-center py-8 text-slate-500 text-sm">
+                     Nenhum backup encontrado.
+                   </div>
+                ) : (
+                  <div className="space-y-3">
+                    {availableBackups.filter(b => 
+                      b.label.toLowerCase().includes(backupSearchQuery.toLowerCase()) || 
+                      new Date(b.timestamp).toLocaleString('pt-BR').includes(backupSearchQuery)
+                    ).map((b, idx, arr) => {
+                      const isMostRecent = availableBackups.length > 0 && b.id === availableBackups[0].id;
+                      return (
+                      <div key={b.id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-white border ${isMostRecent ? 'border-support-blue ring-1 ring-support-blue/30' : 'border-slate-200'} rounded-xl hover:border-support-blue/30 transition-colors gap-3 sm:gap-0`}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-800 text-sm">{b.label}</h4>
+                            {isMostRecent && (
+                              <span className="px-2 py-0.5 bg-blue-50 text-support-blue text-[10px] font-bold rounded-full uppercase tracking-wider border border-blue-100">
+                                Mais Recente
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Criado em: {new Date(b.timestamp).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
+                          <button
+                            onClick={() => {
+                              const a = document.createElement('a');
+                              a.href = `/api/system/backups/download/${b.id}`;
+                              const authHeader = localStorage.getItem('eraia_token');
+                              if (authHeader) {
+                                // If using cookie auth, simple href works. But since we use Bearer token in local storage, we must fetch and then download
+                                fetch(`/api/system/backups/download/${b.id}`, { headers: { Authorization: `Bearer ${authHeader}` } })
+                                  .then(res => res.blob())
+                                  .then(blob => {
+                                     const url = URL.createObjectURL(blob);
+                                     a.href = url;
+                                     a.download = `${b.id}.json`;
+                                     a.click();
+                                     URL.revokeObjectURL(url);
+                                  });
+                              }
+                            }}
+                            disabled={isProcessingSystem}
+                            className="p-1.5 text-slate-500 hover:text-support-blue hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Baixar Backup"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleCompareBackup(b.id, b.label)}
+                            disabled={isProcessingSystem}
+                            className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                          >
+                            Comparar
+                          </button>
+                          <button
+                            onClick={() => handleRestoreBackup(b.id)}
+                            disabled={isProcessingSystem}
+                            className="px-3 py-1.5 text-xs font-bold text-support-blue bg-support-blue/10 rounded-lg hover:bg-support-blue hover:text-white transition-colors"
+                          >
+                            Restaurar
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBackup(b.id)}
+                            disabled={isProcessingSystem}
+                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Excluir Backup"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}

@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "student": {
+      "title": "Student",
+      "description": "Represents a student in the system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "level": { "type": "string", "maxLength": 50 },
+        "currentSchool": { "type": "string", "maxLength": 100 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 2 },
+        "birthDate": { "type": "string", "maxLength": 10 },
+        "instagram": { "type": "string", "maxLength": 50 },
+        "modality": { "type": "string", "maxLength": 50 },
+        "ownerId": { "type": "string", "description": "ID of the user who created the student" },
+        "createdAt": { "type": "number", "description": "Timestamp" },
+        "updatedAt": { "type": "number", "description": "Timestamp" }
+      },
+      "required": ["name", "email", "ownerId", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/student" },
+      "description": "Collection of students."
+    }
+  }
+}

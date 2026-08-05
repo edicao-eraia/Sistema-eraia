@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #8AA7C0;
+  --bg-secondary: #EEF7FF;
+  --bg-white: #FFFFFF;
+  --color-success: #DBEB33;
+  --color-danger: #FF2E8A;
+  --color-support-green: #71F7B6;
+  --color-support-purple: #8C4CF7;
+  --color-support-blue: #167AF6;
+  --color-support-pink: #f3a5c0;
+  --color-support-lilac: #C9B6FA;
+  --color-support-orange: #F8C7AD;
+}
+
+@theme {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-bg-white: var(--bg-white);
+  --color-success: var(--color-success);
+  --color-danger: var(--color-danger);
+  
+  --color-support-green: var(--color-support-green);
+  --color-support-purple: var(--color-support-purple);
+  --color-support-blue: var(--color-support-blue);
+  --color-support-pink: var(--color-support-pink);
+  --color-support-lilac: var(--color-support-lilac);
+  --color-support-orange: var(--color-support-orange);
+  
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Neulis Cursive", "Poppins", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-secondary);
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+}
