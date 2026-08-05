@@ -34,6 +34,7 @@ import {  Menu, Inbox, Calendar,
 import { Student, Teacher, Room, Booking, AISuggestion, AvailabilitySlot, Guardian } from "./types";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { BookingEditModal } from './components/BookingEditModal';
+import { AutoScheduleView } from './components/AutoScheduleView';
 import { UsersManagement } from './components/UsersManagement';
 import { UserProfile } from './components/UserProfile';
 import { TeacherProfile } from './components/TeacherProfile';
@@ -1473,6 +1474,17 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
             <Layers className="w-4 h-4 shrink-0" />
             Salas / Espaços ({rooms.length})
           </button>}
+          {auth?.user?.role === "Administrador" && <button id="tab-agenda-ia"
+            onClick={() => { setActiveTab("agenda-ia"); setIsSidebarOpen(false); }}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium text-xs whitespace-nowrap transition-colors w-full ${
+              activeTab === "agenda-ia"
+                ? "bg-support-blue/10 text-support-blue font-bold border-l-2 border-support-blue"
+                : "text-slate-600 hover:bg-bg-secondary"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 shrink-0" />
+            Agenda com IA
+          </button>}
           {auth?.user?.role === "Administrador" && (
             <>
               <div className="text-[10px] uppercase font-mono font-bold text-slate-400 mb-1 mt-3 px-3 tracking-widest">
@@ -1998,6 +2010,7 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
           
           {activeTab === "profile" && <UserProfile authFetch={authFetch} user={auth?.user} />}
           {activeTab === "users" && <UsersManagement authFetch={authFetch} usersState={usersState} setUsersState={setUsersState} students={students} teachers={teachers} />}
+          {activeTab === "agenda-ia" && <AutoScheduleView authFetch={authFetch} students={students} onScheduled={fetchData} />}
 
           {/* Students list tab */}
 
