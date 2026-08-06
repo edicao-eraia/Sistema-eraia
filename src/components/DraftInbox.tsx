@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, X, Inbox, UserPlus, AlertCircle, ChevronDown, ChevronUp, FileText, Edit2, Save } from 'lucide-react';
 import type { StudentDraft } from '../types';
 import { subscribeToStudentDrafts, approveStudentDraft, rejectStudentDraft, updateStudentDraft } from '../lib/db';
+import { SheetImportButton } from './SheetImportButton';
 
 
 const DRAFT_FIELDS = [
@@ -217,6 +218,7 @@ export const DraftInbox: React.FC<{
             <Inbox className="text-support-blue" /> Triagem de Matrículas
           </h2>
           <p className="text-xs text-slate-500 mt-1">Valide as respostas do formulário e consulte o histórico.</p>
+          <div className="mt-2"><SheetImportButton endpoint="/api/import/students" label="Importar planilha 'Contexto Escolar' (.xlsx)" /></div>
         </div>
         <div className="flex gap-2">
           {["Pendente", "Aprovado", "Rejeitado", "Todos"].map(status => (

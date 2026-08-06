@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, X, Inbox, UserPlus, AlertCircle, ChevronDown, ChevronUp, Users, Trash2, FileText, Download, Plus, RefreshCw } from 'lucide-react';
 import type { GuardianDraft, Guardian } from '../types';
 import { createGuardianInFirebase, subscribeToGuardianDrafts, approveGuardianDraft, rejectGuardianDraft, updateGuardianDraft, fetchStudentsFromFirebase } from '../lib/db';
+import { SheetImportButton } from './SheetImportButton';
 
 // Header com o JWT do servidor (rotas /api agora exigem auth).
 const authHeaders = (): Record<string, string> => {
@@ -183,6 +184,7 @@ export const GuardianInbox: React.FC<{
             <Users className="text-success" /> Triagem de Responsáveis
           </h2>
           <p className="text-xs text-slate-500 mt-1">Valide os cadastros de responsáveis e verifique o vínculo com alunos.</p>
+          <div className="mt-2"><SheetImportButton endpoint="/api/import/guardians" label="Importar planilha 'Dados Financeiro' (.xlsx)" /></div>
         </div>
         <div className="flex gap-2">
           {["Pendente", "Aprovado", "Rejeitado", "Todos"].map(status => (

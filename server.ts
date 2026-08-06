@@ -58,6 +58,7 @@ import express from "express";
 import path from "path";
 import multer from "multer";
 import { parse } from "csv-parse/sync";
+import * as XLSX from "xlsx";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -1872,6 +1873,104 @@ app.post("/api/ai/suggest", authenticateToken, async (req, res) => {
   }
 });
 
+
+// ===================================================================
+//  F6 — IMPORT DE PLANILHAS (Contexto Escolar / Dados Financeiro)
+//  Cada linha da planilha (resposta de formulário Google) vira um
+//  RASCUNHO (aluno ou responsável), que segue pro fluxo de aprovação.
+// ===================================================================
+const rowsFromXlsx = (buffer: Buffer): any[][] => {
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
+};
+// Localiza a coluna por nome (exato primeiro, depois "contém") e lê a célula.
+const makeCol = (headers: string[]) => (row: any[], cands: string[]): string => {
+  let i = -1;
+  for (const c of cands) { i = headers.findIndex(h => h === c.toLowerCase()); if (i >= 0) break; }
+  if (i < 0) for (const c of cands) { i = headers.findIndex(h => h.includes(c.toLowerCase())); if (i >= 0) break; }
+  return i >= 0 ? (row[i] ?? "").toString().trim() : "";
+};
+const onlyDigits = (s: string) => (s || "").replace(/[.\-()\s/]/g, "");
+
+const STUDENT_MAP: Record<string, string[]> = {
+  nomeCompleto: ["nome completo:"], cpf: ["cpf:"], dataNascimento: ["data de nascimento"],
+  email: ["e-mail:", "endereço de e-mail"], whatsapp: ["whatsapp:"], instagram: ["instagram:"],
+  escolaAtual: ["escola atual:"], cidade: ["cidade"], estado: ["estado:"], anoEscolar: ["ano escolar:"],
+  turno: ["turno:"], portalAlunoLink: ["portal do aluno"], portalAlunoLogin: ["login:"], portalAlunoSenhaRaw: ["senha:"],
+  boletimUrl: ["anexe seu último boletim"], avaliacaoDesempenho: ["como você avalia seu desempenho"],
+  materiasDificuldade: ["mais dificuldade"], materiasFacilidade: ["mais facilidade"],
+  jaFezVestibular: ["você já fez vestibular"], vestibularParticipei: ["participei:"], vestibularAno: ["ano:"],
+  notaLinguagens: ["linguagens:"], notaHumanas: ["humanas:"], notaNatureza: ["natureza:"],
+  notaMatematica: ["matemática:"], notaRedacao: ["redação_enem"],
+  estudaFora: ["estuda fora da escola"], cursosExtracurriculares: ["cursos extracurriculares"],
+  atividadeFisica: ["atividade física"], rotinaSemanal: ["rotina semanal"], rotinaEstudosFora: ["rotina de estudos fora"],
+  conteudosRevisar: ["precisa revisar do 1"], conteudosPrimeiraSemana: ["primeira semana"],
+  mantemRotinaEstudos: ["manter uma rotina de estudos"], maiorDificuldade: ["maior dificuldade hoje"],
+  tempoEstudoPorDia: ["quanto tempo você estuda"], costumaRevisar: ["costuma revisar"],
+  principalObjetivo: ["principal objetivo"], cursoOuArea: ["curso ou área"],
+  motivoAcompanhamento: ["decidiu iniciar o acompanhamento"], esperaMudancaRotina: ["espera que mude"],
+};
+const GUARDIAN_MAP: Record<string, string[]> = {
+  nomeCompleto: ["nome do responsável"], email: ["e-mail:", "endereço de e-mail"], cpf: ["cpf:"],
+  whatsapp: ["telefone:"], profissao: ["profissão"],
+};
+
+app.post("/api/import/students", authenticateToken, requireRole(["Administrador"]), upload.single("file"), (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: "Envie a planilha no campo 'file'." });
+  let rows: any[][];
+  try { rows = rowsFromXlsx(req.file.buffer); } catch (e: any) { return res.status(400).json({ error: "Planilha inválida: " + e.message }); }
+  const headers = (rows[0] || []).map((h: any) => (h || "").toString().trim().toLowerCase());
+  const col = makeCol(headers);
+  const seenCpf = new Set(studentDrafts.map((d: any) => onlyDigits(d.cpf)).filter(Boolean));
+  const seenEmail = new Set(studentDrafts.map((d: any) => (d.email || "").toLowerCase()).filter(Boolean));
+  students.forEach((s: any) => { if (s.cpf) seenCpf.add(onlyDigits(s.cpf)); if (s.email) seenEmail.add((s.email || "").toLowerCase()); });
+
+  let imported = 0, skipped = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r]; if (!row || row.every(c => (c ?? "") === "")) continue;
+    const draft: any = { id: `draft-imp-${Date.now()}-${r}`, status: "Pendente", submittedAt: new Date().toISOString() };
+    for (const [field, cands] of Object.entries(STUDENT_MAP)) draft[field] = col(row, cands);
+    draft.email = (draft.email || "").toLowerCase();
+    draft.cpf = draft.cpf || "";
+    const cpfKey = onlyDigits(draft.cpf), emailKey = draft.email;
+    if (!draft.nomeCompleto && !emailKey) { skipped++; continue; }
+    if ((cpfKey && seenCpf.has(cpfKey)) || (emailKey && seenEmail.has(emailKey))) { skipped++; continue; }
+    if (cpfKey) seenCpf.add(cpfKey); if (emailKey) seenEmail.add(emailKey);
+    draft.rawResponses = Object.fromEntries((rows[0] || []).map((h: any, i: number) => [String(h), row[i]]));
+    studentDrafts.push(draft); imported++;
+  }
+  res.json({ message: "Importação concluída", imported, skipped, total: rows.length - 1 });
+});
+
+app.post("/api/import/guardians", authenticateToken, requireRole(["Administrador"]), upload.single("file"), (req: any, res: any) => {
+  if (!req.file) return res.status(400).json({ error: "Envie a planilha no campo 'file'." });
+  let rows: any[][];
+  try { rows = rowsFromXlsx(req.file.buffer); } catch (e: any) { return res.status(400).json({ error: "Planilha inválida: " + e.message }); }
+  const headers = (rows[0] || []).map((h: any) => (h || "").toString().trim().toLowerCase());
+  const col = makeCol(headers);
+  const seenCpf = new Set(guardianDrafts.map((d: any) => onlyDigits(d.cpf)).filter(Boolean));
+  const seenEmail = new Set(guardianDrafts.map((d: any) => (d.email || "").toLowerCase()).filter(Boolean));
+  guardians.forEach((g: any) => { if (g.cpf) seenCpf.add(onlyDigits(g.cpf)); if (g.email) seenEmail.add((g.email || "").toLowerCase()); });
+
+  let imported = 0, skipped = 0;
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r]; if (!row || row.every(c => (c ?? "") === "")) continue;
+    const draft: any = {
+      id: `draft-g-imp-${Date.now()}-${r}`, status: "Pendente", submittedAt: new Date().toISOString(),
+      parentesco: "Responsável", responsavelFinanceiro: true, nomeAluno: "",
+    };
+    for (const [field, cands] of Object.entries(GUARDIAN_MAP)) draft[field] = col(row, cands);
+    draft.email = (draft.email || "").toLowerCase();
+    const cpfKey = onlyDigits(draft.cpf || ""), emailKey = draft.email;
+    if (!draft.nomeCompleto && !emailKey) { skipped++; continue; }
+    if ((cpfKey && seenCpf.has(cpfKey)) || (emailKey && seenEmail.has(emailKey))) { skipped++; continue; }
+    if (cpfKey) seenCpf.add(cpfKey); if (emailKey) seenEmail.add(emailKey);
+    draft.rawResponses = Object.fromEntries((rows[0] || []).map((h: any, i: number) => [String(h), row[i]]));
+    guardianDrafts.push(draft); imported++;
+  }
+  res.json({ message: "Importação concluída", imported, skipped, total: rows.length - 1 });
+});
 
 // ===================================================================
 //  F4 — MOTOR DE AGENDA AUTÔNOMO
