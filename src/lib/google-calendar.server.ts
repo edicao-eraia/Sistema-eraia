@@ -23,7 +23,6 @@ export function authUrl(state: string): string {
     scope: SCOPE,
     access_type: 'offline',   // pede refresh_token
     prompt: 'consent',        // força retornar refresh_token
-    include_granted_scopes: 'true',
     state,
   });
   return `${OAUTH_AUTH}?${p.toString()}`;
