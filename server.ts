@@ -78,6 +78,7 @@ const serverDb = getFirestoreServer(serverFirebaseApp, firebaseConfigObj.firesto
 import dotenv from "dotenv";
 import { loadState, saveState } from "./src/lib/store.server";
 import { encryptSecret, decryptSecret, vaultConfigured } from "./src/lib/vault.server";
+import { googleConfigured, authUrl as googleAuthUrl, exchangeCode as googleExchange, refreshAccessToken as googleRefresh, getUserEmail as googleUserEmail, createEvent as gcalCreate, updateEvent as gcalUpdate, deleteEvent as gcalDelete } from "./src/lib/google-calendar.server";
 
 dotenv.config({ path: fsNode.existsSync('.env.local') ? '.env.local' : '.env' });
 
@@ -845,7 +846,9 @@ app.delete("/api/bookings/:id", authenticateToken, async (req: any, res: any) =>
   try {
     const index = bookings.findIndex((b: any) => b.id === id);
     if (index === -1) return res.status(404).json({ error: "Agendamento não encontrado" });
+    const removed = bookings[index];
     bookings.splice(index, 1);
+    syncBookingGoogle(removed, 'delete').catch(() => {});
     res.json({ message: "Agendamento excluído" });
   } finally {
     releaseMutex();
@@ -1335,6 +1338,7 @@ app.post("/api/bookings/advanced", authenticateToken, async (req: any, res: any)
     });
 
     releaseMutex();
+    newBookings.forEach((b: any) => syncBookingGoogle(b, 'upsert').catch(() => {}));
     return res.json({ message: "Agendamento(s) criado(s) com sucesso.", bookings: newBookings });
 
   } catch (err) {
@@ -1511,6 +1515,7 @@ app.post("/api/bookings", authenticateToken, requireRole(["Administrador"]), asy
     };
 
     bookings.push(newBooking);
+    syncBookingGoogle(newBooking, 'upsert').catch(() => {});
     res.status(201).json({ message: "Agendamento confirmado com sucesso!", booking: newBooking });
 
   } catch (err: any) {
@@ -1545,6 +1550,13 @@ app.patch("/api/bookings/:id", authenticateToken, async (req, res) => {
     booking.status = status;
     if (topicFinished !== undefined) {
       booking.topicFinished = topicFinished;
+    }
+
+    // Google Agenda: cancelada/desmarcada remove o evento; senão atualiza
+    if (booking.status === 'cancelada' || booking.status === 'desmarcada') {
+      syncBookingGoogle(booking, 'delete').catch(() => {});
+    } else {
+      syncBookingGoogle(booking, 'upsert').catch(() => {});
     }
 
     // Handle topicFinished state in the tactical plan
@@ -1875,6 +1887,93 @@ app.post("/api/ai/suggest", authenticateToken, async (req, res) => {
 
 
 // ===================================================================
+//  F5 — GOOGLE AGENDA (OAuth + sync de agendamentos)
+// ===================================================================
+// Devolve um access_token válido pro professor (renova via refresh cifrado).
+async function teacherAccessToken(teacher: any): Promise<string | null> {
+  const g = teacher?.google;
+  if (!g?.connected || !g.enc?.encryptedHash) return null;
+  try {
+    const refresh = decryptSecret(g.enc.encryptedHash, g.enc.iv, g.enc.authTag);
+    return await googleRefresh(refresh);
+  } catch (e) { console.error('[google] token do professor', teacher.id, e); return null; }
+}
+
+// Cria/atualiza/remove o evento do agendamento na agenda do professor (best-effort).
+async function syncBookingGoogle(booking: any, action: 'upsert' | 'delete'): Promise<void> {
+  try {
+    if (!googleConfigured() || !booking?.teacherId) return;
+    const teacher = teachers.find((t: any) => t.id === booking.teacherId);
+    if (!teacher) return;
+    const token = await teacherAccessToken(teacher);
+    if (!token) return;
+
+    if (action === 'delete') {
+      if (booking.googleEventId) await gcalDelete(token, booking.googleEventId);
+      return;
+    }
+    const student = students.find((s: any) => s.id === booking.studentId);
+    const room = rooms.find((r: any) => r.id === booking.roomId);
+    const ev = {
+      date: booking.date, startTime: booking.startTime, endTime: booking.endTime,
+      summary: `${booking.subject || 'Aula'}${student ? ' — ' + student.name : ''}`,
+      description: `Aluno: ${student?.name || '-'}\nMatéria: ${booking.subject || '-'}` + (booking.topic ? `\nTópico: ${booking.topic}` : ''),
+      location: room?.name || '',
+    };
+    if (booking.googleEventId) {
+      await gcalUpdate(token, booking.googleEventId, ev);
+    } else {
+      const id = await gcalCreate(token, ev);
+      if (id) { booking.googleEventId = id; saveDb(); }
+    }
+  } catch (e) { console.error('[google] sync agendamento', booking?.id, e); }
+}
+
+// Inicia a conexão OAuth de um professor (retorna a URL de consentimento).
+app.get('/api/google/connect', authenticateToken, requireRole(['Administrador']), (req: any, res: any) => {
+  if (!googleConfigured()) return res.status(400).json({ error: 'Integração Google não configurada (faltam GOOGLE_OAUTH_CLIENT_ID/SECRET no servidor).' });
+  const teacherId = req.query.teacherId as string;
+  if (!teacherId) return res.status(400).json({ error: 'teacherId é obrigatório.' });
+  if (!teachers.find((t: any) => t.id === teacherId)) return res.status(404).json({ error: 'Professor não encontrado.' });
+  const state = jwt.sign({ teacherId }, JWT_SECRET, { expiresIn: '10m' });
+  res.json({ url: googleAuthUrl(state) });
+});
+
+// Callback do Google (não autenticado — a confiança vem do state assinado).
+app.get('/api/google/callback', async (req: any, res: any) => {
+  const back = (msg: string) => res.redirect('/?google=' + msg);
+  if (req.query.error) return back('erro');
+  try {
+    const decoded: any = jwt.verify(req.query.state as string, JWT_SECRET);
+    const teacher = teachers.find((t: any) => t.id === decoded.teacherId);
+    if (!teacher) return back('prof_nao_encontrado');
+    const tokens = await googleExchange(req.query.code as string);
+    if (!tokens.refresh_token) return back('sem_refresh');
+    const email = await googleUserEmail(tokens.access_token);
+    teacher.google = { connected: true, email, enc: encryptSecret(tokens.refresh_token) };
+    saveDb();
+    return back('conectado');
+  } catch (e) {
+    console.error('[google] callback', e);
+    return back('erro');
+  }
+});
+
+app.post('/api/google/disconnect', authenticateToken, requireRole(['Administrador']), (req: any, res: any) => {
+  const teacher = teachers.find((t: any) => t.id === req.body.teacherId);
+  if (!teacher) return res.status(404).json({ error: 'Professor não encontrado.' });
+  teacher.google = { connected: false };
+  res.json({ success: true });
+});
+
+app.get('/api/google/status', authenticateToken, (req: any, res: any) => {
+  res.json({
+    configured: googleConfigured(),
+    teachers: teachers.map((t: any) => ({ teacherId: t.id, connected: !!t.google?.connected, email: t.google?.email || '' })),
+  });
+});
+
+// ===================================================================
 //  F6 — IMPORT DE PLANILHAS (Contexto Escolar / Dados Financeiro)
 //  Cada linha da planilha (resposta de formulário Google) vira um
 //  RASCUNHO (aluno ou responsável), que segue pro fluxo de aprovação.
@@ -2146,6 +2245,7 @@ app.post("/api/ai/auto-schedule/commit", authenticateToken, requireRole(["Admini
       bookings.push(booking);
       created.push(booking);
     }
+    created.forEach((b: any) => syncBookingGoogle(b, 'upsert').catch(() => {}));
     res.json({ success: true, created, skipped });
   } finally {
     releaseMutex();

@@ -298,6 +298,36 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
     return fetch(url, { ...options, headers });
   };
 
+  // --- Google Agenda (F5) ---
+  const [googleStatus, setGoogleStatus] = useState<Record<string, any>>({});
+  const fetchGoogleStatus = async () => {
+    try {
+      const r = await authFetch('/api/google/status');
+      const d = await r.json();
+      const m: any = {};
+      (d.teachers || []).forEach((t: any) => { m[t.teacherId] = t; });
+      setGoogleStatus(m);
+    } catch { /* ignore */ }
+  };
+  const connectGoogle = async (teacherId: string) => {
+    try {
+      const r = await authFetch(`/api/google/connect?teacherId=${teacherId}`);
+      const d = await r.json();
+      if (!r.ok) { toast.error(d.error || 'Não foi possível iniciar a conexão.'); return; }
+      window.location.href = d.url;
+    } catch { toast.error('Erro ao iniciar conexão com o Google.'); }
+  };
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('google');
+    if (p) {
+      if (p === 'conectado') toast.success('Google Agenda conectada!');
+      else if (p === 'sem_refresh') toast.error('Reconecte e aceite as permissões (o Google não retornou acesso de longo prazo).');
+      else toast.error('Falha ao conectar a Google Agenda.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    fetchGoogleStatus();
+  }, []);
+
   // DB State
     const [classGroups, setClassGroups] = useState<any[]>([]);
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -2292,7 +2322,14 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button 
+                        <button
+                          onClick={() => { if (!googleStatus[teacher.id]?.connected) connectGoogle(teacher.id); }}
+                          className={`transition-colors ${googleStatus[teacher.id]?.connected ? 'text-success' : 'text-slate-400 hover:text-support-blue'}`}
+                          title={googleStatus[teacher.id]?.connected ? `Google Agenda conectada (${googleStatus[teacher.id]?.email || ''})` : 'Conectar Google Agenda'}
+                        >
+                          <Calendar className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => setEntityToDelete({type: 'teacher', id: teacher.id, name: teacher.name})}
                           className="text-danger/80 hover:text-danger transition-colors"
                           title="Excluir Professor"
