@@ -76,7 +76,8 @@ const firebaseConfigObj = JSON.parse(fsNode.readFileSync('firebase-applet-config
 const serverFirebaseApp = initFirebaseServer(firebaseConfigObj);
 const serverDb = getFirestoreServer(serverFirebaseApp, firebaseConfigObj.firestoreDatabaseId);
 import dotenv from "dotenv";
-import { loadState, saveState } from "./src/lib/store.server";
+import { loadState, saveState, type AppState } from "./src/lib/store.server";
+import { migrateAndPersistAvailability } from "./src/lib/availability";
 import { encryptSecret, decryptSecret, vaultConfigured } from "./src/lib/vault.server";
 import { googleConfigured, authUrl as googleAuthUrl, exchangeCode as googleExchange, refreshAccessToken as googleRefresh, getUserEmail as googleUserEmail, createEvent as gcalCreate, updateEvent as gcalUpdate, deleteEvent as gcalDelete } from "./src/lib/google-calendar.server";
 
@@ -105,7 +106,7 @@ const DB_FILE = 'local_db.json';
 
 async function loadDb() {
   try {
-    const data = await loadState();
+    const { state: data } = await migrateAndPersistAvailability(await loadState(), saveDb);
     users = data.users;
     systemBackups = data.systemBackups;
     students = data.students;
@@ -124,12 +125,12 @@ async function loadDb() {
 
 // Salvamentos serializados (fila) p/ evitar transações concorrentes.
 let savePromise: Promise<void> = Promise.resolve();
-function saveDb(): Promise<void> {
+function saveDb(state: AppState = {
+  users, systemBackups, students, teachers, rooms,
+  classGroups, bookings, studentDrafts, guardianDrafts, guardians, curriculums,
+}): Promise<void> {
   savePromise = savePromise.then(() =>
-    saveState({
-      users, systemBackups, students, teachers, rooms,
-      classGroups, bookings, studentDrafts, guardianDrafts, guardians, curriculums,
-    })
+    saveState(state)
   ).catch((e) => console.error('Failed to save DB to Postgres', e));
   return savePromise;
 }

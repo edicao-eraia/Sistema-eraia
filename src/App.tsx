@@ -32,6 +32,7 @@ import {  Menu, Inbox, Calendar,
   HelpCircle
 , Mic, Square, X, FileText, LogOut, Edit2, Download, Trash2, Save, AlertCircle, Upload, Loader2 } from "lucide-react";
 import { Student, Teacher, Room, Booking, AISuggestion, AvailabilitySlot, Guardian } from "./types";
+import { SHIFT_DEFINITIONS, createWeekdaySlots } from "./lib/availability";
 import { StudentProfileModal } from "./components/StudentProfileModal";
 import { BookingEditModal } from './components/BookingEditModal';
 import { AutoScheduleView } from './components/AutoScheduleView';
@@ -617,8 +618,8 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
     city: "",
     state: "",
     availability: [
-      { dayOfWeek: 1, startTime: "08:00", endTime: "13:00" },
-      { dayOfWeek: 3, startTime: "13:00", endTime: "18:00" }
+      createWeekdaySlots('morning')[0],
+      createWeekdaySlots('afternoon')[2]
     ] as AvailabilitySlot[],
     fixedActivities: [] as string[], profile360: undefined
   });
@@ -977,7 +978,7 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
         setEditingStudentId(null);
         setStudentForm({
           name: "", email: "", phone: "", level: "Intermediário", currentSchool: "", birthDate: "", instagram: "", city: "", state: "",
-          availability: [{ dayOfWeek: 1, startTime: "08:00", endTime: "13:00" }, { dayOfWeek: 3, startTime: "13:00", endTime: "18:00" }],
+          availability: [createWeekdaySlots('morning')[0], createWeekdaySlots('afternoon')[2]],
           fixedActivities: []
         });
         toast.success("Aluno atualizado com sucesso.");
@@ -999,8 +1000,8 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
         city: "",
         state: "",
         availability: [
-          { dayOfWeek: 1, startTime: "08:00", endTime: "13:00" },
-          { dayOfWeek: 3, startTime: "13:00", endTime: "18:00" }
+          createWeekdaySlots('morning')[0],
+          createWeekdaySlots('afternoon')[2]
         ],
         fixedActivities: []
       });
@@ -3042,10 +3043,10 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                         {/* Quick Turno Presets */}
                         <div className="grid grid-cols-2 gap-1">
                           {[
-                            { label: "🌅 Manhã", start: "08:00", end: "13:00", key: "manha" },
-                            { label: "🌇 Tarde", start: "13:00", end: "18:00", key: "tarde" },
-                            { label: "🌃 Noite", start: "18:00", end: "21:00", key: "noite" },
-                            { label: "⚡ Integral", start: "08:00", end: "18:00", key: "integral" }
+                            { label: "🌅 Manhã", key: "manha", shift: SHIFT_DEFINITIONS.morning },
+                            { label: "🌇 Tarde", key: "tarde", shift: SHIFT_DEFINITIONS.afternoon },
+                            { label: "🌃 Noite", key: "noite", shift: SHIFT_DEFINITIONS.night },
+                            { label: "⚡ Integral", key: "integral", shift: { start: SHIFT_DEFINITIONS.morning.start, end: SHIFT_DEFINITIONS.night.start } }
                           ].map((p) => {
                             const isPresetActive = activityDetails.shift === p.key;
                             return (
@@ -3056,8 +3057,8 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                                   setActivityDetails({
                                     ...activityDetails,
                                     shift: p.key,
-                                    startTime: p.start,
-                                    endTime: p.end
+                                    startTime: p.shift.start,
+                                    endTime: p.shift.end
                                   });
                                 }}
                                 className={`text-[10px] py-1.5 rounded-lg border transition-all font-bold ${
@@ -3066,7 +3067,7 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                                     : "bg-white border-amber-100 text-amber-800 hover:bg-white/80"
                                 }`}
                               >
-                                {p.label} <span className="text-[8px] opacity-80 block font-mono font-medium">{p.start} - {p.end}</span>
+                                {p.label} <span className="text-[8px] opacity-80 block font-mono font-medium">{p.shift.start} - {p.shift.end}</span>
                               </button>
                             );
                           })}
@@ -3142,50 +3143,38 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                       <button
                         type="button"
                         onClick={() => {
-                          const morningSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "08:00",
-                            endTime: "13:00"
-                          }));
-                          setStudentForm({ ...studentForm, availability: morningSlots });
+                          setStudentForm({ ...studentForm, availability: createWeekdaySlots('morning') });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">🌅</span>
                         <span>Todas as Manhãs</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">08:00 - 13:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.morning.start} - {SHIFT_DEFINITIONS.morning.end}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          const afternoonSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "13:00",
-                            endTime: "18:00"
-                          }));
-                          setStudentForm({ ...studentForm, availability: afternoonSlots });
+                          setStudentForm({ ...studentForm, availability: createWeekdaySlots('afternoon') });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">🌇</span>
                         <span>Todas as Tardes</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">13:00 - 18:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.afternoon.start} - {SHIFT_DEFINITIONS.afternoon.end}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          const fullSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "08:00",
-                            endTime: "18:00"
-                          }));
-                          setStudentForm({ ...studentForm, availability: fullSlots });
+                          setStudentForm({
+                            ...studentForm,
+                            availability: createWeekdaySlots('morning').map(slot => ({ ...slot, endTime: SHIFT_DEFINITIONS.night.start })),
+                          });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">⚡</span>
                         <span>Período Integral</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">08:00 - 18:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.morning.start} - {SHIFT_DEFINITIONS.night.start}</span>
                       </button>
                     </div>
                   </div>
@@ -3206,17 +3195,13 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                         return (
                           <div key={day.num} className="grid grid-cols-4 gap-1.5 items-center bg-white p-1 rounded border border-slate-100">
                             <span className="text-[10px] font-bold text-slate-700 pl-1.5">{day.label}</span>
-                            {[
-                              { label: "Manhã", start: "08:00", end: "13:00" },
-                              { label: "Tarde", start: "13:00", end: "18:00" },
-                              { label: "Noite", start: "18:00", end: "21:00" }
-                            ].map((shift) => {
+                            {Object.entries(SHIFT_DEFINITIONS).map(([key, shift]) => {
                               const isActive = studentForm.availability.some(
                                 (avail) => avail.dayOfWeek === day.num && avail.startTime === shift.start && avail.endTime === shift.end
                               );
                               return (
                                 <button
-                                  key={shift.label}
+                                  key={key}
                                   type="button"
                                   onClick={() => {
                                     if (isActive) {
@@ -3478,50 +3463,38 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                       <button
                         type="button"
                         onClick={() => {
-                          const morningSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "08:00",
-                            endTime: "13:00"
-                          }));
-                          setTeacherForm({ ...teacherForm, availability: morningSlots });
+                          setTeacherForm({ ...teacherForm, availability: createWeekdaySlots('morning') });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">🌅</span>
                         <span>Todas as Manhãs</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">08:00 - 13:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.morning.start} - {SHIFT_DEFINITIONS.morning.end}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          const afternoonSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "13:00",
-                            endTime: "18:00"
-                          }));
-                          setTeacherForm({ ...teacherForm, availability: afternoonSlots });
+                          setTeacherForm({ ...teacherForm, availability: createWeekdaySlots('afternoon') });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">🌇</span>
                         <span>Todas as Tardes</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">13:00 - 18:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.afternoon.start} - {SHIFT_DEFINITIONS.afternoon.end}</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => {
-                          const fullSlots = [1, 2, 3, 4, 5].map(day => ({
-                            dayOfWeek: day,
-                            startTime: "08:00",
-                            endTime: "18:00"
-                          }));
-                          setTeacherForm({ ...teacherForm, availability: fullSlots });
+                          setTeacherForm({
+                            ...teacherForm,
+                            availability: createWeekdaySlots('morning').map(slot => ({ ...slot, endTime: SHIFT_DEFINITIONS.night.start })),
+                          });
                         }}
                         className="bg-white hover:bg-support-blue/10 border border-slate-200 hover:border-support-blue/50 text-[10px] py-1.5 px-2 rounded-lg font-bold text-slate-700 flex flex-col items-center justify-center transition-colors shadow-2xs"
                       >
                         <span className="text-base mb-0.5">⚡</span>
                         <span>Período Integral</span>
-                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">08:00 - 18:00</span>
+                        <span className="text-[8px] text-slate-400 font-mono mt-0.5">{SHIFT_DEFINITIONS.morning.start} - {SHIFT_DEFINITIONS.night.start}</span>
                       </button>
                     </div>
                   </div>
@@ -3542,17 +3515,13 @@ function AppContent({ auth, setAuth }: { auth: any, setAuth: any }) {
                         return (
                           <div key={day.num} className="grid grid-cols-4 gap-1.5 items-center bg-white p-1 rounded border border-slate-100">
                             <span className="text-[10px] font-bold text-slate-700 pl-1.5">{day.label}</span>
-                            {[
-                              { label: "Manhã", start: "08:00", end: "13:00" },
-                              { label: "Tarde", start: "13:00", end: "18:00" },
-                              { label: "Noite", start: "18:00", end: "21:00" }
-                            ].map((shift) => {
+                            {Object.entries(SHIFT_DEFINITIONS).map(([key, shift]) => {
                               const isActive = teacherForm.availability.some(
                                 (avail) => avail.dayOfWeek === day.num && avail.startTime === shift.start && avail.endTime === shift.end
                               );
                               return (
                                 <button
-                                  key={shift.label}
+                                  key={key}
                                   type="button"
                                   onClick={() => {
                                     if (isActive) {

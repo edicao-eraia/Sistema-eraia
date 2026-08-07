@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, CheckSquare, Square, Zap, Check, AlertCircle } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { DisciplineSyllabus, DidacticSequence, MacroContent, MicroContent } from '../types';
 
 interface CurriculumImporterModalProps {
@@ -37,6 +38,7 @@ export function CurriculumImporterModal({ subject, onClose, onImport }: Curricul
         }
       } catch (e) {
         console.error(e);
+        toast.error('Não foi possível carregar os currículos salvos.');
       }
     }
   }, [subject]);

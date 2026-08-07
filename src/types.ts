@@ -276,6 +276,13 @@ export interface ClassGroupSchedule {
   teacherId: string;
 }
 
+export interface ClassGroupPlan {
+  subject: string;
+  weeklyHours: number;
+  strategy: string;
+  sequences: DidacticSequence[];
+}
+
 export interface ClassGroup {
   id: string;
   name: string;
@@ -284,6 +291,7 @@ export interface ClassGroup {
   workload: number;
   subjects?: string[];
   schedules?: ClassGroupSchedule[];
+  plans?: ClassGroupPlan[];
 }
 
 export interface MicroContent {
