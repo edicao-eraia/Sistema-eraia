@@ -107,3 +107,17 @@ test('não persiste quando não há disponibilidade legada', async () => {
   assert.equal(persistCalls, 0);
   assert.strictEqual(result.state, state);
 });
+
+test('propaga a falha de persistência da migração', async () => {
+  const state = {
+    students: [{ id: 'student-1', availability: [{ dayOfWeek: 1, startTime: '13:00', endTime: '18:00' }] }],
+    teachers: [],
+  };
+
+  await assert.rejects(
+    migrateAndPersistAvailability(state, async () => {
+      throw new Error('Postgres indisponível');
+    }),
+    /Postgres indisponível/,
+  );
+});

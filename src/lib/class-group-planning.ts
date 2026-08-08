@@ -8,16 +8,18 @@ export function mergeImportedSequences(
   existing: DidacticSequence[],
   imported: DidacticSequence[],
 ): DidacticSequence[] {
-  const keys = new Set<string>();
+  const keys = new Set(existing.map(sequenceKey));
+  const sequences = existing.map((sequence, index) => ({ ...sequence, order: index + 1 }));
 
-  return [...existing, ...imported].reduce<DidacticSequence[]>((sequences, sequence) => {
+  for (const sequence of imported) {
     const key = sequenceKey(sequence);
-    if (keys.has(key)) return sequences;
+    if (keys.has(key)) continue;
 
     keys.add(key);
     sequences.push({ ...sequence, order: sequences.length + 1 });
-    return sequences;
-  }, []);
+  }
+
+  return sequences;
 }
 
 export function normalizePlansForSubjects(plans: ClassGroupPlan[], subjects: string[]) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { X, Search, CheckSquare, Square, Zap, Check, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { DisciplineSyllabus, DidacticSequence, MacroContent, MicroContent } from '../types';
@@ -10,6 +10,9 @@ interface CurriculumImporterModalProps {
 }
 
 export function CurriculumImporterModal({ subject, onClose, onImport }: CurriculumImporterModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [syllabuses, setSyllabuses] = useState<DisciplineSyllabus[]>([]);
   const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>('');
   
@@ -42,6 +45,49 @@ export function CurriculumImporterModal({ subject, onClose, onImport }: Curricul
       }
     }
   }, [subject]);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const focusFrame = requestAnimationFrame(() => closeButtonRef.current?.focus());
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )) as HTMLElement[];
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
 
   const activeSyllabus = syllabuses.find(s => s.id === selectedDisciplineId);
 
@@ -98,13 +144,26 @@ export function CurriculumImporterModal({ subject, onClose, onImport }: Curricul
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[70] animate-fade-in">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl flex flex-col h-[85vh]">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl flex flex-col h-[85vh]"
+      >
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-2xl shrink-0">
           <div>
-            <h3 className="font-black text-slate-800 text-lg">Importar do Planejamento</h3>
+            <h3 id={titleId} className="font-black text-slate-800 text-lg">Importar do Planejamento</h3>
             <p className="text-xs text-slate-500">Selecione tópicos da grade curricular para adicionar ao plano.</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar importador"
+            className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-support-blue"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -169,14 +228,20 @@ export function CurriculumImporterModal({ subject, onClose, onImport }: Curricul
                     {macro.microContents.map(micro => {
                       const isSelected = selectedMicros.has(micro.id);
                       return (
-                        <div 
-                          key={micro.id} 
-                          onClick={() => toggleMicro(micro.id)}
-                          className={`p-3 flex items-start gap-3 cursor-pointer transition-colors hover:bg-slate-50 ${isSelected ? 'bg-blue-50/30' : ''}`}
+                        <label
+                          key={micro.id}
+                          className={`p-3 flex items-start gap-3 cursor-pointer rounded-sm transition-colors hover:bg-slate-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-inset focus-within:ring-support-blue ${isSelected ? 'bg-blue-50/30' : ''}`}
                         >
-                          <button className={`mt-0.5 shrink-0 ${isSelected ? 'text-support-blue' : 'text-slate-300'}`}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleMicro(micro.id)}
+                            aria-label={micro.name}
+                            className="sr-only"
+                          />
+                          <span aria-hidden="true" className={`mt-0.5 shrink-0 ${isSelected ? 'text-support-blue' : 'text-slate-300'}`}>
                             {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
-                          </button>
+                          </span>
                           <div>
                             <p className={`text-sm font-medium ${isSelected ? 'text-slate-900' : 'text-slate-700'}`}>
                               {micro.name}
@@ -185,7 +250,7 @@ export function CurriculumImporterModal({ subject, onClose, onImport }: Curricul
                               <p className="text-xs text-slate-500 mt-1 line-clamp-2">{micro.description}</p>
                             )}
                           </div>
-                        </div>
+                        </label>
                       );
                     })}
                     {macro.microContents.length === 0 && (

@@ -24,6 +24,25 @@ export interface AppState {
   curriculums: any[];
 }
 
+export interface StateClient {
+  query(sql: string, params?: unknown[]): Promise<{ rows?: any[] }>;
+  release(): void;
+}
+
+export interface StatePool {
+  connect(): Promise<StateClient>;
+}
+
+export function createSerializedSaver<State>(persist: (state: State) => Promise<void>) {
+  let queue: Promise<void> = Promise.resolve();
+
+  return (state: State): Promise<void> => {
+    const operation = queue.then(() => persist(state));
+    queue = operation.catch(() => undefined);
+    return operation;
+  };
+}
+
 export async function ensureSchema(): Promise<void> {
   await pool.query(`
     create table if not exists kv_state (
@@ -49,8 +68,8 @@ export async function loadState(): Promise<AppState> {
   return out as AppState;
 }
 
-export async function saveState(state: AppState): Promise<void> {
-  const client = await pool.connect();
+export async function saveStateWithPool(dbPool: StatePool, state: AppState): Promise<void> {
+  const client = await dbPool.connect();
   try {
     await client.query('begin');
 
@@ -85,4 +104,8 @@ export async function saveState(state: AppState): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+export async function saveState(state: AppState): Promise<void> {
+  await saveStateWithPool(pool, state);
 }

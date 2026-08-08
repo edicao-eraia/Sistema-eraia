@@ -40,6 +40,28 @@ test('trata frente e conteúdo equivalentes com espaços e maiúsculas como dupl
   ]);
 });
 
+test('preserva duplicatas preexistentes e deduplica apenas novos itens importados', () => {
+  const existing = [
+    { front: '', content: '', order: 9 },
+    { front: '', content: '', order: 10 },
+    { front: 'Álgebra', content: 'Funções', order: 11 },
+    { front: 'Álgebra', content: 'Funções', order: 12 },
+  ];
+  const imported = [
+    { front: 'Álgebra', content: 'Funções', order: 1 },
+    { front: 'Geometria', content: 'Triângulos', order: 2 },
+    { front: ' geometria ', content: ' triângulos ', order: 3 },
+  ];
+
+  assert.deepEqual(mergeImportedSequences(existing, imported), [
+    { front: '', content: '', order: 1 },
+    { front: '', content: '', order: 2 },
+    { front: 'Álgebra', content: 'Funções', order: 3 },
+    { front: 'Álgebra', content: 'Funções', order: 4 },
+    { front: 'Geometria', content: 'Triângulos', order: 5 },
+  ]);
+});
+
 test('normaliza planos mantendo disciplinas ativas separadas e retornando órfãs', () => {
   const mathematics = { subject: 'Matemática', weeklyHours: 2, strategy: '', sequences: [] };
   const physics = { subject: 'Física', weeklyHours: 3, strategy: 'Revisão', sequences: [] };

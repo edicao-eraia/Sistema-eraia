@@ -120,19 +120,35 @@ export function ClassGroupsList({ userId, classGroups, setClassGroups, teachers,
       if (!shouldDiscard) return;
     }
 
+    const plans = active.map(plan => ({
+      ...plan,
+      subject: plan.subject.trim(),
+      weeklyHours: Number(plan.weeklyHours) || 0,
+      strategy: plan.strategy.trim(),
+      sequences: (plan.sequences || [])
+        .filter(sequence => sequence.content.trim().length > 0)
+        .map((sequence, index) => ({
+          ...sequence,
+          front: sequence.front?.trim(),
+          content: sequence.content.trim(),
+          order: index + 1,
+        })),
+    }));
     const payload = {
       ...form,
       workload: Number(form.workload),
       teacherIds: form.teacherIds?.filter(id => id && id.trim() !== "") || [],
       studentIds: form.studentIds?.filter(id => id && id.trim() !== "") || [],
       subjects,
-      plans: active,
+      plans,
     };
 
     try {
       if (editingId) {
-        await updateClassGroupInFirebase(userId, editingId, payload);
-        setClassGroups(prev => prev.map(c => c.id === editingId ? { ...c, ...payload } as any : c));
+        const updatedGroup = await updateClassGroupInFirebase(userId, editingId, payload);
+        setClassGroups(prev => prev.map(c => (
+          c.id === editingId ? { ...updatedGroup, id: editingId } as ClassGroup : c
+        )));
         toast.success("Turma atualizada com sucesso");
       } else {
         const newGroup = await createClassGroupInFirebase(userId, payload);
@@ -171,7 +187,7 @@ export function ClassGroupsList({ userId, classGroups, setClassGroups, teachers,
       studentIds: c.studentIds && c.studentIds.length > 0 ? c.studentIds : [""],
       subjects: c.subjects && c.subjects.length > 0 ? c.subjects : [""],
       schedules: c.schedules || [],
-      plans: c.plans || [],
+      plans: (c.plans || []).map(plan => ({ ...plan, sequences: plan.sequences || [] })),
     });
     setEditingId(c.id);
     setShowModal(true);
@@ -250,14 +266,14 @@ export function ClassGroupsList({ userId, classGroups, setClassGroups, teachers,
                       ))}
                       {(!c.subjects || c.subjects.length === 0) && <span className="text-xs text-slate-400 italic">Nenhuma disciplina</span>}
                     </div>
-                    {(c.plans || []).some(plan => plan.sequences.length > 0) && (
+                    {(c.plans || []).some(plan => (plan.sequences || []).length > 0) && (
                       <div className="space-y-1 rounded-lg border border-blue-100 bg-blue-50/60 p-2">
                         {(c.plans || [])
-                          .filter(plan => plan.sequences.length > 0)
+                          .filter(plan => (plan.sequences || []).length > 0)
                           .map(plan => (
                             <div key={plan.subject} className="flex items-center gap-1.5 text-[11px] font-medium text-blue-800">
                               <BookOpen className="h-3 w-3 shrink-0" />
-                              <span>{plan.subject}: {plan.sequences.length} tópicos</span>
+                              <span>{plan.subject}: {(plan.sequences || []).length} tópicos</span>
                             </div>
                           ))}
                       </div>

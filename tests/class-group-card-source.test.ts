@@ -264,3 +264,97 @@ test('informa o usuário quando os currículos salvos não podem ser carregados'
     console.error = originalConsoleError;
   }
 });
+
+test('expõe o importador como diálogo modal, nomeia a seleção e restaura o foco', async () => {
+  dom.window.localStorage.setItem('eraia_curriculums', JSON.stringify([{
+    id: 'math',
+    disciplineName: 'Matemática',
+    macroContents: [{
+      id: 'algebra',
+      name: 'Álgebra',
+      microContents: [{ id: 'functions', name: 'Funções', description: 'Funções reais' }],
+    }],
+  }]));
+  const view = renderClassGroups([makeGroup()]);
+
+  fireEvent.click(view.getByRole('button', { name: 'Editar turma' }));
+  const importTrigger = view.getByRole('button', { name: 'Importar do Planejamento' });
+  importTrigger.focus();
+  fireEvent.click(importTrigger);
+
+  const dialog = view.getByRole('dialog', { name: 'Importar do Planejamento' });
+  const close = within(dialog).getByRole('button', { name: 'Fechar importador' });
+  await waitFor(() => assert.equal(document.activeElement === close, true));
+
+  const topic = within(dialog).getByRole('checkbox', { name: 'Funções' }) as HTMLInputElement;
+  assert.equal(topic.checked, false);
+  topic.focus();
+  assert.equal(document.activeElement === topic, true);
+  const topicRow = topic.closest('label');
+  assert.ok(topicRow);
+  assert.equal(topicRow.classList.contains('focus-within:ring-2'), true);
+  assert.equal(topicRow.classList.contains('focus-within:ring-support-blue'), true);
+  fireEvent.click(topic);
+  assert.equal(topic.checked, true);
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => assert.equal(view.queryByRole('dialog', { name: 'Importar do Planejamento' }), null));
+  assert.equal(document.activeElement === importTrigger, true);
+});
+
+test('mantém o foco do teclado contido dentro do importador', async () => {
+  dom.window.localStorage.setItem('eraia_curriculums', JSON.stringify([{
+    id: 'math',
+    disciplineName: 'Matemática',
+    macroContents: [{
+      id: 'algebra',
+      name: 'Álgebra',
+      microContents: [{ id: 'functions', name: 'Funções', description: '' }],
+    }],
+  }]));
+  const view = renderClassGroups([makeGroup()]);
+
+  fireEvent.click(view.getByRole('button', { name: 'Editar turma' }));
+  fireEvent.click(view.getByRole('button', { name: 'Importar do Planejamento' }));
+  const dialog = view.getByRole('dialog', { name: 'Importar do Planejamento' });
+  const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  ));
+  assert.ok(focusable.length > 1);
+
+  focusable.at(-1)?.focus();
+  fireEvent.keyDown(document, { key: 'Tab' });
+  assert.equal(document.activeElement === focusable[0], true);
+
+  focusable[0].focus();
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+  assert.equal(document.activeElement === focusable.at(-1), true);
+});
+
+test('não envia nem resume linha manual sem conteúdo', async () => {
+  const calls = recordFetch();
+  const view = renderClassGroups([makeGroup({
+    plans: [{ subject: 'Matemática', weeklyHours: 2, strategy: '', sequences: [] }],
+  })]);
+
+  fireEvent.click(view.getByRole('button', { name: 'Editar turma' }));
+  fireEvent.click(view.getByRole('button', { name: 'Adicionar manualmente' }));
+  fireEvent.click(view.getByRole('button', { name: 'Salvar' }));
+
+  await waitFor(() => assert.equal(calls.some(call => call.options.method === 'PUT'), true));
+  const update = calls.find(call => call.options.method === 'PUT');
+  assert.ok(update);
+  assert.deepEqual(JSON.parse(String(update.options.body)).plans[0].sequences, []);
+  await waitFor(() => assert.equal(view.queryByText('Matemática: 1 tópico'), null));
+});
+
+test('tolera plano legado sem sequences no cartão e no editor', () => {
+  const malformed = makeGroup({
+    plans: [{ subject: 'Matemática', weeklyHours: 2, strategy: '' } as any],
+  });
+  const view = renderClassGroups([malformed]);
+
+  assert.equal(view.queryByText(/Matemática: 1 tópico/), null);
+  fireEvent.click(view.getByRole('button', { name: 'Editar turma' }));
+  assert.ok(view.getByText('0 tópicos no plano'));
+});

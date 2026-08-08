@@ -76,8 +76,9 @@ const firebaseConfigObj = JSON.parse(fsNode.readFileSync('firebase-applet-config
 const serverFirebaseApp = initFirebaseServer(firebaseConfigObj);
 const serverDb = getFirestoreServer(serverFirebaseApp, firebaseConfigObj.firestoreDatabaseId);
 import dotenv from "dotenv";
-import { loadState, saveState, type AppState } from "./src/lib/store.server";
+import { createSerializedSaver, loadState, saveState, type AppState } from "./src/lib/store.server";
 import { migrateAndPersistAvailability } from "./src/lib/availability";
+import { registerClassGroupRoutes } from "./src/lib/class-groups.server";
 import { encryptSecret, decryptSecret, vaultConfigured } from "./src/lib/vault.server";
 import { googleConfigured, authUrl as googleAuthUrl, exchangeCode as googleExchange, refreshAccessToken as googleRefresh, getUserEmail as googleUserEmail, createEvent as gcalCreate, updateEvent as gcalUpdate, deleteEvent as gcalDelete } from "./src/lib/google-calendar.server";
 
@@ -105,34 +106,34 @@ import fsNode from 'fs';
 const DB_FILE = 'local_db.json';
 
 async function loadDb() {
-  try {
-    const { state: data } = await migrateAndPersistAvailability(await loadState(), saveDb);
-    users = data.users;
-    systemBackups = data.systemBackups;
-    students = data.students;
-    teachers = data.teachers;
-    rooms = data.rooms;
-    classGroups = data.classGroups;
-    bookings = data.bookings;
-    studentDrafts = data.studentDrafts;
-    guardianDrafts = data.guardianDrafts;
-    guardians = data.guardians;
-    curriculums = data.curriculums;
-  } catch (e) {
-    console.error('Failed to load DB from Postgres', e);
-  }
+  const { state: data } = await migrateAndPersistAvailability(await loadState(), saveDb);
+  users = data.users;
+  systemBackups = data.systemBackups;
+  students = data.students;
+  teachers = data.teachers;
+  rooms = data.rooms;
+  classGroups = data.classGroups;
+  bookings = data.bookings;
+  studentDrafts = data.studentDrafts;
+  guardianDrafts = data.guardianDrafts;
+  guardians = data.guardians;
+  curriculums = data.curriculums;
 }
 
 // Salvamentos serializados (fila) p/ evitar transações concorrentes.
-let savePromise: Promise<void> = Promise.resolve();
-function saveDb(state: AppState = {
+function getAppState(overrides: Partial<AppState> = {}): AppState {
+  return {
   users, systemBackups, students, teachers, rooms,
   classGroups, bookings, studentDrafts, guardianDrafts, guardians, curriculums,
-}): Promise<void> {
-  savePromise = savePromise.then(() =>
-    saveState(state)
-  ).catch((e) => console.error('Failed to save DB to Postgres', e));
-  return savePromise;
+  ...overrides,
+  };
+}
+
+const enqueueSave = createSerializedSaver(saveState);
+function saveDb(state: AppState = getAppState()): Promise<void> {
+  const operation = enqueueSave(state);
+  void operation.catch(error => console.error('Failed to save DB to Postgres', error));
+  return operation;
 }
 
 const seedMasterUser = async () => {
@@ -252,8 +253,8 @@ const app = express();
 const upload = multer();
 app.use((req, res, next) => {
   res.on('finish', () => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && res.statusCode >= 200 && res.statusCode < 300) {
-      saveDb();
+    if (!res.locals.persistenceHandled && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && res.statusCode >= 200 && res.statusCode < 300) {
+      void saveDb();
     }
   });
   next();
@@ -718,114 +719,18 @@ app.post("/api/extract-schedule", authenticateToken, async (req: any, res: any) 
 });
 
 // --- ClassGroups ---
-app.get("/api/class-groups", authenticateToken, (req: any, res: any) => {
-  res.json({ classGroups });
-});
-
-// Helper to generate future bookings for a class group
-function syncClassGroupBookings(group) {
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  
-  // 1. Remove future "agendada" bookings for this class group
-  bookings = bookings.filter(b => {
-    if (b.classGroupId !== group.id) return true;
-    if (b.status !== "agendada") return true;
-    const bDate = new Date(b.date);
-    return bDate < today;
-  });
-
-  // 2. Generate new bookings for the next 3 months
-  if (!group.schedules || group.schedules.length === 0) return;
-  
-  const end = new Date(today);
-  end.setMonth(end.getMonth() + 3); // 3 months in advance
-
-  let current = new Date(today);
-  while (current <= end) {
-    const dow = current.getDay();
-    const scheds = group.schedules.filter(s => s.dayOfWeek === dow);
-    for (const s of scheds) {
-      if (s.teacherId) {
-        const dateStr = `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`;
-        const exists = bookings.some(b => b.classGroupId === group.id && b.date === dateStr && b.startTime === s.startTime && b.status !== "agendada");
-        if (exists) continue;
-        bookings.push({
-          id: `booking-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          classGroupId: group.id,
-          studentIds: group.studentIds || [],
-          teacherId: s.teacherId,
-          roomId: s.roomId || "",
-          date: `${current.getFullYear()}-${String(current.getMonth()+1).padStart(2,'0')}-${String(current.getDate()).padStart(2,'0')}`,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          subject: s.subject,
-          status: "agendada",
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
-    current.setDate(current.getDate() + 1);
-  }
-}
-
-app.post("/api/class-groups", authenticateToken, requireRole(["Administrador"]), async (req: any, res: any) => {
-  const data = req.body;
-  if (!data.name || !data.workload) return res.status(400).json({ error: "Nome e Carga Horária são obrigatórios." });
-  
-  await acquireMutex();
-  try {
-    const newGroup: any = {
-      ...data,
-      id: `class-${Date.now()}`,
-      teacherIds: data.teacherIds || [],
-      studentIds: data.studentIds || [],
-      subjects: data.subjects || []
-    };
-    classGroups.push(newGroup);
-    syncClassGroupBookings(newGroup);
-    res.json({ message: "Turma cadastrada com sucesso", classGroup: newGroup });
-  } finally {
-    releaseMutex();
-  }
-});
-
-app.put("/api/class-groups/:id", authenticateToken, requireRole(["Administrador"]), async (req: any, res: any) => {
-  const { id } = req.params;
-  await acquireMutex();
-  try {
-    const index = classGroups.findIndex(c => c.id === id);
-    if (index === -1) return res.status(404).json({ error: "Turma não encontrada" });
-    
-    classGroups[index] = { ...classGroups[index], ...req.body };
-    syncClassGroupBookings(classGroups[index]);
-    res.json({ message: "Turma atualizada", classGroup: classGroups[index] });
-  } finally {
-    releaseMutex();
-  }
-});
-
-app.delete("/api/class-groups/:id", authenticateToken, requireRole(["Administrador"]), async (req: any, res: any) => {
-  const { id } = req.params;
-  await acquireMutex();
-  try {
-    const index = classGroups.findIndex(c => c.id === id);
-    if (index === -1) return res.status(404).json({ error: "Turma não encontrada" });
-    const deletedGroup = classGroups[index];
-    classGroups.splice(index, 1);
-    // Remove all future agendada bookings for this group
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    bookings = bookings.filter(b => {
-      if (b.classGroupId !== deletedGroup.id) return true;
-      if (b.status !== "agendada") return true;
-      const bDate = new Date(b.date);
-      return bDate < today;
-    });
-    res.json({ message: "Turma deletada" });
-  } finally {
-    releaseMutex();
-  }
+registerClassGroupRoutes(app, {
+  authenticate: authenticateToken,
+  requireAdmin: requireRole(["Administrador"]),
+  getState: () => ({ classGroups, bookings }),
+  setState: state => {
+    classGroups = state.classGroups;
+    bookings = state.bookings;
+  },
+  persist: state => saveDb(getAppState(state)),
+  acquireMutex,
+  releaseMutex,
+  onPersistenceError: error => console.error('Failed to persist class group', error),
 });
 
 // --- Currículos / Ementas (F3: front usava Firestore direto) ---
@@ -2436,4 +2341,7 @@ app.post("/api/system/reset", authenticateToken, requireRole(["Administrador"]),
   });
 }
 
-startServer();
+void startServer().catch(error => {
+  console.error('Failed to start server', error);
+  process.exitCode = 1;
+});
